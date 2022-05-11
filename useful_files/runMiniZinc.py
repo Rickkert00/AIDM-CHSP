@@ -7,23 +7,23 @@
 #mail at the end of the task
 #SBATCH --mail-type=END
 #SBATCH --time=1:00:00
+import os
 
 from minizinc import Instance, Model, Solver
 import time, sys
 
 #Cluster imports
-# import instanceGeneration
+import instanceGeneration
 
-#PyCharm imports
-from searchSpace import instanceGeneration
-from searchSpace import runSearchSpace
+# from searchSpace import instanceGeneration
+# from searchSpace import runSearchSpace
 
 def main():
-
+    pass
     #Cluster imports
     # import runSearchSpace
 
-    runSearchSpace.run_search_space_experiments(int(sys.argv[1]))
+    # runSearchSpace.run_search_space_experiments(int(sys.argv[1]))
     # runSearchSpace.run_search_space_experiments(sys.argv[1])
 
     # print("Command line argument: ", int(sys.argv[1]))
@@ -32,7 +32,11 @@ def example_use():
 
     # Generate data and run a single instance
     data_filename_to_use = "generated_instance_1"
-    datafile_location = "./dataFiles/" + data_filename_to_use + ".dzn"
+    directory = "./dataFiles/"
+    datafile_location = directory + data_filename_to_use + ".dzn"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
     problem_instance = instanceGeneration.generate_data(15, 9, 1, 1, 1, 1, 1, 1)
     problem_instance.write_to_datafile(datafile_location)
     run_instance(datafile_location, "", "gecode")
@@ -94,7 +98,7 @@ def run_instance(data_file, additional_data_file, solver_name):
     # Get the solver
     solver = Solver.lookup(solver_name)
     print("Solver used:", solver.name)
-
+    print("path", os.getcwdb())
     # Create instance and solve
     instance = Instance(solver, model)
 
@@ -104,8 +108,8 @@ def run_instance(data_file, additional_data_file, solver_name):
 
     # Print all results
     for i in range(len(result)):
-        #print("-------Result:\n", result[i])
-        pass
+        print("-------Result:\n", result[i])
+        # pass
 
     # print("Time it took to solve: ", (endTime - startTime))
     # print("Best value: ", result[len(result)-1])
@@ -116,4 +120,4 @@ def get_datafile_location(filename):
     return "../dataFiles/" + filename + ".dzn"
 
 if __name__ == "__main__":
-    main()
+    example_use()

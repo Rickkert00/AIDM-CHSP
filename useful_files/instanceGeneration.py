@@ -1,3 +1,4 @@
+import os
 import random
 
 class ProblemInstance:
@@ -13,7 +14,6 @@ class ProblemInstance:
         self.c_variable = c_variable
 
     def write_to_datafile(self, datafile_location):
-
         # Create or change file
         f = open(datafile_location, "w")
 
