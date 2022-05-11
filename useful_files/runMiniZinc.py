@@ -36,7 +36,7 @@ def example_use():
     datafile_location = directory + data_filename_to_use + ".dzn"
     if not os.path.exists(directory):
         os.makedirs(directory)
-
+    print("Using file", datafile_location)
     problem_instance = instanceGeneration.generate_data(15, 9, 1, 1, 1, 1, 1, 1)
     problem_instance.write_to_datafile(datafile_location)
     run_instance(datafile_location, "", "gecode")
@@ -102,10 +102,10 @@ def run_instance(data_file, additional_data_file, solver_name):
     # Create instance and solve
     instance = Instance(solver, model)
 
-    startTime = time.time() # !!! May want to use another time function
+    startTime = time.time()
     result = instance.solve(intermediate_solutions=True)
     endTime = time.time()
-
+    print(result)
     # Print all results
     for i in range(len(result)):
         print("-------Result:\n", result[i])
@@ -113,7 +113,9 @@ def run_instance(data_file, additional_data_file, solver_name):
 
     # print("Time it took to solve: ", (endTime - startTime))
     # print("Best value: ", result[len(result)-1])
-
+    if len(result) == 0:
+      print("Warning no results found")
+      return -1
     return result[len(result)-1].objective, result.statistics["solveTime"].total_seconds()
 
 def get_datafile_location(filename):
