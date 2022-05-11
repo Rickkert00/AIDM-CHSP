@@ -1,0 +1,64 @@
+---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-1-1.dzn -O1 -p 1 -s
+> parsed: Sol(2307,true,HashMap(_objective -> 521, hoist -> array1d(0..12, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]), B -> array1d(1..12, [0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0]), p -> 521, r -> array1d(0..12, [0, 195, 324, 485, 76, 131, 272, 354, 450, 378, 43, 168, 220])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-2-1.dzn -O1 -p 1 -s
+> parsed: Sol(849,true,HashMap(_objective -> 251, hoist -> array1d(0..12, [1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2]), B -> array1d(1..12, [0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1]), p -> 251, r -> array1d(0..12, [0, 191, 73, 215, 99, 158, 41, 129, 210, 115, 40, 169, 0])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-2-2.dzn -O1 -p 1 -s
+> parsed: Sol(1242,true,HashMap(_objective -> 221, hoist -> array1d(0..12, [1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2]), B -> array1d(1..12, [1, 0, 1, 1, 0, 0, 1, 0, 2, 2, 0, 1]), p -> 221, r -> array1d(0..12, [0, 10, 148, 126, 33, 92, 175, 63, 132, 154, 86, 208, 50])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-3-1.dzn -O1 -p 1 -s
+> parsed: Sol(559,true,HashMap(_objective -> 170, hoist -> array1d(0..12, [1, 2, 1, 1, 1, 2, 1, 3, 2, 2, 3, 3, 3]), B -> array1d(1..12, [1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0]), p -> 170, r -> array1d(0..12, [0, 15, 132, 110, 82, 137, 50, 153, 50, 72, 70, 39, 99])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-3-2.dzn -O1 -p 1 -s
+> parsed: Sol(1187,true,HashMap(_objective -> 168, hoist -> array1d(0..12, [1, 2, 1, 1, 1, 2, 2, 1, 2, 3, 2, 3, 3]), B -> array1d(1..12, [1, 0, 1, 1, 0, 1, 1, 0, 1, 2, 1, 0]), p -> 168, r -> array1d(0..12, [0, 13, 130, 108, 80, 145, 89, 45, 113, 141, 48, 27, 82])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-4-1.dzn -O1 -p 1 -s
+> parsed: Sol(213,true,HashMap(_objective -> 150, hoist -> array1d(0..12, [1, 1, 2, 3, 4, 1, 3, 2, 2, 3, 4, 4, 4]), B -> array1d(1..12, [1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0]), p -> 150, r -> array1d(0..12, [0, 31, 11, 3, 150, 65, 33, 115, 58, 60, 77, 46, 106])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/1-5-1.dzn -O1 -p 1 -s
+> parsed: Sol(147,true,HashMap(_objective -> 150, hoist -> array1d(0..12, [1, 1, 2, 3, 1, 2, 2, 3, 3, 4, 4, 5, 5]), B -> array1d(1..12, [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1]), p -> 150, r -> array1d(0..12, [0, 31, 144, 142, 105, 19, 102, 34, 101, 103, 150, 143, 71])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-1-1.dzn -O1 -p 1 -s
+> parsed: Sol(6041,true,HashMap(_objective -> 1076, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]), B -> array1d(1..24, [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0]), p -> 1076, r -> array1d(0..24, [0, 185, 327, 503, 615, 680, 765, 847, 914, 441, 997, 48, 104, 284, 396, 538, 650, 711, 794, 876, 943, 227, 1036, 77, 139])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-2-1.dzn -O1 -p 1 -s
+> parsed: Sol(732317,true,HashMap(_objective -> 455, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0]), p -> 455, r -> array1d(0..24, [0, 211, 348, 41, 178, 238, 375, 28, 116, 268, 315, 447, 66, 264, 376, 94, 231, 296, 404, 62, 129, 151, 198, 345, 404])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-2-2.dzn -O1 -p 1 -s
+> parsed: Sol(536166,true,HashMap(_objective -> 448, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]), p -> 448, r -> array1d(0..24, [0, 231, 368, 62, 198, 258, 401, 94, 161, 288, 335, 34, 91, 321, 437, 169, 288, 350, 24, 134, 204, 226, 393, 62, 123])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-2-3.dzn -O1 -p 1 -s
+> parsed: Sol(504947,true,HashMap(_objective -> 448, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]), p -> 448, r -> array1d(0..24, [0, 231, 368, 62, 198, 258, 401, 94, 161, 288, 335, 34, 91, 321, 437, 171, 288, 352, 26, 134, 206, 228, 395, 64, 125])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-3-1.dzn -O1 -p 1 -s
+> parsed: Sol(508177,true,HashMap(_objective -> 448, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]), p -> 448, r -> array1d(0..24, [0, 231, 368, 62, 198, 258, 401, 94, 161, 288, 335, 34, 91, 321, 437, 171, 288, 352, 26, 134, 206, 228, 395, 64, 125])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-3-2.dzn -O1 -p 1 -s
+> parsed: Sol(505637,true,HashMap(_objective -> 448, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]), p -> 448, r -> array1d(0..24, [0, 231, 368, 62, 198, 258, 401, 94, 161, 288, 335, 34, 91, 321, 437, 171, 288, 352, 26, 134, 206, 228, 395, 64, 125])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-3-3.dzn -O1 -p 1 -s
+> parsed: Sol(505647,true,HashMap(_objective -> 448, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]), p -> 448, r -> array1d(0..24, [0, 231, 368, 62, 198, 258, 401, 94, 161, 288, 335, 34, 91, 321, 437, 171, 288, 352, 26, 134, 206, 228, 395, 64, 125])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/2-4-1.dzn -O1 -p 1 -s
+> parsed: Sol(503217,true,HashMap(_objective -> 448, hoist -> array1d(0..24, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2]), B -> array1d(1..24, [0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0]), p -> 448, r -> array1d(0..24, [0, 231, 368, 62, 198, 258, 401, 94, 161, 288, 335, 34, 91, 321, 437, 171, 288, 352, 26, 134, 206, 228, 395, 64, 125])))
+> ---------------- Running solver chuffed ----------------
+> Using 1 cores
+> Running: timeout 3630 minizinc --no-output-comments --output-mode dzn --output-objective --solver chuffed --time-limit 3600000 -a wallace-hoist_cpaior20-submission.mzn dzn-table1/3-1-1.dzn -O1 -p 1 -s
+> parsed: Sol(57549,true,HashMap(_objective -> 1438, hoist -> array1d(0..36, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]), B -> array1d(1..36, [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]), p -> 1438, r -> array1d(0..36, [0, 220, 362, 557, 669, 734, 830, 925, 1021, 949, 1144, 1280, 1348, 105, 247, 406, 524, 589, 702, 798, 893, 1197, 1105, 1251, 1307, 49, 179, 321, 433, 488, 627, 769, 864, 1053, 1393, 77, 135])))
