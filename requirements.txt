@@ -1,2 +1,4 @@
 minizinc
 numpy
+torch
+torch-summary
