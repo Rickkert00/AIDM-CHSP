@@ -2,3 +2,5 @@ minizinc
 numpy
 torch
 torch-summary
+jupyter
+iminizinc

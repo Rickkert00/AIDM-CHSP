@@ -32,6 +32,8 @@ int: Multiplier ; % Benchmark problem size
 int: Hoists ;   %Try multiple hoists
 int: Capacity ; % Try multi-job capacity tanks
 
+int: MaxPeriod_c ; % Constrain the period to speed up the solution
+
 int: J;  % number of simult. jobs
 int: Ninner;  %  number of tanks
 int: Tinner = Ninner+1;  % number of treatments
@@ -63,8 +65,9 @@ constraint sum(B) <=J ;
 constraint forall(i in 1..N)(r[i]+p*B[i] >= r[i-1]+f(i-1)+tmin(i)) ;
 constraint forall(i in 1..N)( r[i]+p*B[i] <= r[i-1]+f(i-1)+tmax(i)) ;
 
+constraint p <= MaxPeriod_c;
 constraint p >= r[N]+f(N) ;
-constraint r[0] = 0; 
+constraint r[0] = 0;
 
 constraint forall(i in 1..N,j in 0..i-1)(hoist[i] > hoist[j] \/
               ( (r[i]+f(i)+e(i+1,j)<=r[j] \/ r[j]+f(j)+e(j+1,i)<=r[i]) /\
