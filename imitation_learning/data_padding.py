@@ -67,4 +67,4 @@ if __name__ == '__main__':
     instance = get_data_instance(pad_size, INF)
     print(instance)
     predictor = BoundPredictor()
-    summary(predictor, (200, 3785))\
+    summary(predictor, (200, 3785))
