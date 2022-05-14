@@ -6,20 +6,25 @@ from random import random
 
 import numpy as np
 import torch
+from torch import nn, optim
 from torch.utils.data import DataLoader
+
+from imitation_learning.neural_network import BoundPredictor
+
 
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
     parser.add_argument('--num_train_steps', default=1000000, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--encoder_lr', default=1e-3, type=float)
+    parser.add_argument('--learning_rate', default=1e-3, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
 
     parser.add_argument('--log_interval', default=100, type=int)
-    parser.add_argument('--work_dir', default='work_dir/', type=str)
+    parser.add_argument('--work_dir', default='work_dir', type=str)
+    parser.add_argument('--epochs', default=100, type=int)
     args = parser.parse_args(_args)
     return args
 
@@ -62,13 +67,9 @@ def train(train_loader, model, optimizer, criterion, device):
         optimizer.zero_grad()
 
         # Forward + backward + optimize
-        points, has_square = model(inputs)
-        square_in_image = torch.any(labels != 0, dim=1)
+        period = model(inputs)
 
-        points_in_image = points[square_in_image]
-        labels_in_image = labels[square_in_image]
-
-        loss = criterion(points_in_image, labels_in_image)
+        loss = criterion(period, labels)
 
         loss.backward()
         optimizer.step()
@@ -78,17 +79,30 @@ def train(train_loader, model, optimizer, criterion, device):
         total += labels.size(0)
         # correct += torch.isclose(points_in_image.data, labels_in_image, atol=2).sum().item() // 8
 
-    return avg_loss / len(train_loader)#, 100 * correct / total
+    return avg_loss.item() / len(train_loader)#, 100 * correct / total
 
-def load_data(folder="../data/dzn/", training_size=0.8):
-    input_data = np.load('../data/dzn/dzn.npy', allow_pickle=True)
-    solved = np.load('../data/solved/dzn_output.npy', allow_pickle=True)
-    input_data = np.array(input_data)
-    solved = np.array(solved)
+def load_data(folder, training_size=0.8):
+    files = os.listdir(folder)
+    files = sorted(files)
+    input_data = []
+    solved_all = []
+    input_keys = ['multiplier', 'hoist', 'jobs']
+    solution_keys = ['objective']
+    for f in files:
+        if f.endswith('npy'):
+            print(f)
+            print(np.load(folder+f, allow_pickle=True))
+            d = np.load(folder+f, allow_pickle=True).item()
+            d['hoist'] = len(d['hoist'])
+            input_data.append([d[k] for k in input_keys])
+            print(input_data)
+            # solved = np.load('../data/solved/dzn_output.npy', allow_pickle=True)
+    input_data = [torch.from_numpy(d).float() for d in np.array(input_data)]
+    solved = [torch.from_numpy(np.array(d)).float().unsqueeze(dim=0) for d in solved_all['obj']]
     length = len(input_data)
     training_length = int(length * training_size)
-    training = (input_data[:training_length], solved[:training_length])
-    test = (input_data[training_length:], solved[training_length:])
+    training = [(input_data[i], solved[i]) for i in range(training_length)]
+    test = [(input_data[i], solved[i]) for i in range(training_length,length)]
     return training, test
 
 def main(_args=None):
@@ -114,15 +128,23 @@ def main(_args=None):
 
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cpu')
+    folder = '../chsp-generators-main/instances/linear_solutions/'
+    train_set, test_set = load_data(folder)
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
-    train_set, test_set, image_width = load_data()
-    train_loader = DataLoader(train_set, batch_size=params.batch_size, shuffle=True)
-    test_loader = DataLoader(test_set, batch_size=params.batch_size, shuffle=True)
+    model = BoundPredictor()
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), args.learning_rate)#, weight_decay=args.weight_decay)
 
-    if args.model_dir is not None:
-      pass
+    for i in range(args.epochs):
+        loss = train(train_loader, model, optimizer, criterion, device)
+        print(loss)
+    # if args.model_dir is not None:
+    #   pass
         # agent.load(args.model_dir, args.model_step)
     # L = Logger(args.work_dir, use_tb=args.save_tb)
+
 
 
 

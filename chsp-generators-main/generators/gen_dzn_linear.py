@@ -1,5 +1,7 @@
 import random
 
+import numpy as np
+
 
 def emptyTime(emptys, i, j):
     sum = 0
@@ -10,12 +12,13 @@ def emptyTime(emptys, i, j):
     return sum
 
 
-def generateRandomProblem():
+def generateRandomProblem(save_np=False):
     processingTimeScale = [30, 60, 100, 150, 250, 450, 600]
     similarity = ["similar", "diverse"]
     variability = ["small", "large"]
     timeRange = ["fixed", "small", "large"]
     inst = 0
+    instances = []
     for rounds in range(1, 4):
         for tanks in range(3, 25):
             for processingTimeBase in processingTimeScale:
@@ -114,38 +117,45 @@ def generateRandomProblem():
                                 filename = "../instances/linear/" + str(inst)
                                 filename += "."
                                 filename += "dzn"
-                                with open(filename, 'w') as f:
-                                    f.write("Ninner = %d;\n" % tanks)
-                                    # f.write("J = 9;\n")
-                                    f.write("tmin = %s;\n" % lowers)
-                                    f.write("tmax = %s;\n" % uppers)
-                                    f.write("f = array1d(0..Ninner, %s);\n" % fulls)
-                                    f.write("e = array2d(1..Tinner,0..Ninner, [\n")
-                                    for i in range(1, tanks + 1):
-                                        for j in range(0, tanks + 1):
-                                            f.write(str(emptyTime(emptys, i, j)))
-                                            if j < tanks:
-                                                f.write(",")
-                                        if i < tanks + 1:
-                                            f.write(",\n")
+                                n = tanks+1
+                                def get_row(emptys, i):
+                                    row = []
+                                    for j in range(n):
+                                        row.append(emptyTime(emptys, i, j))
+                                    return row
 
-                                    # Write the first row as the last one (see Wallace instructions)
-                                    i = 0
-                                    for j in range(0, tanks + 1):
-                                        f.write(str(emptyTime(emptys, i, j)))
-                                        if j < tanks:
-                                            f.write(",")
-                                    f.write("\n]);\n")
-                                    # Only for calculating statistics after the solution - not required by the model
-                                    f.write("% emptys = " + str(emptys))
+                                e = np.zeros((n, n)).astype(int)
+                                for i in range(1,n):
+                                    e[i-1] = get_row(emptys, i)
+                                # Write the first row as the last one (see Wallace instructions)
+                                e[-1] = get_row(emptys, 0)
+                                if save_np:
+                                    instances.append({'Ninner': tanks, 'tmin': lowers, 'tmax':uppers, 'f':fulls, 'e':e})
+                                else:
+                                    with open(filename, 'w') as f:
+                                        f.write("Ninner = %d;\n" % tanks)
+                                        # f.write("J = 9;\n")
+                                        f.write("tmin = %s;\n" % lowers)
+                                        f.write("tmax = %s;\n" % uppers)
+                                        f.write("f = array1d(0..Ninner, %s);\n" % fulls)
+                                        f.write("e = array2d(1..Tinner,0..Ninner, [\n")
+                                        arr_str = np.array2string(e, separator=',')
+                                        arr_str.replace('[ ,','')
+                                        arr_str.replace('[[','[')
+                                        arr_str.replace('],','')
+                                        arr_str.replace(']]',']')
+                                        f.write(str(e))
+                                        f.write("\n]);\n")
+                                        # Only for calculating statistics after the solution - not required by the model
+                                        f.write("% emptys = " + str(emptys))
 
 
 # Main code
 def main():
-    random.seed()
-    generateRandomProblem()
+    random.seed(0)
+    generateRandomProblem(save_np=True)
 
 
 if __name__ == "__main__":
-    # main()
+    main()
     print("For safety reasons the run function is commented ")

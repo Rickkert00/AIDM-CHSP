@@ -4,3 +4,4 @@ torch
 torch-summary
 jupyter
 iminizinc
+gurobipy
