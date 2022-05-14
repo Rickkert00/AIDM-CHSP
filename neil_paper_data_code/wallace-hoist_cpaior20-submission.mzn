@@ -22,7 +22,9 @@
 %
 
 include "globals.mzn";
-include "PU.dzn" ;
+% include "PU.dzn" ;
+include "/dzn/1-1-1.dzn";
+% include "../chsp-generators-main/instances/linear/1.dzn";
 %include "BO1.dzn" ;
 
 
@@ -43,6 +45,8 @@ array [1..Tinner,0..Ninner] of int: e ;
 array [0..Ninner] of int: f ;
 
 int: INF = 9999 ;  % infinity
+
+J = round(0.8 * Ninner);
 
 
 %%% variables %%%
@@ -93,6 +97,7 @@ output ["multiplier ", show(Multiplier), "\n"] ++
        ["removal times ", show(r), "\n"] ++
        ["sorted removal times ", show(sort(r)),"\n"] ++
        ["period ", show(p)] ++
+       ["\nB ", show(B)] ++
        ["\njobs ", show(sum(B))] ;
 
 
