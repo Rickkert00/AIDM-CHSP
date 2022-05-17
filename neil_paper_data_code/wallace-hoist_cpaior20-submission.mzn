@@ -23,7 +23,7 @@
 
 include "globals.mzn";
 % include "PU.dzn" ;
-include "/dzn/1-1-1.dzn";
+include "1-1-1.dzn";
 % include "../chsp-generators-main/instances/linear/1.dzn";
 %include "BO1.dzn" ;
 

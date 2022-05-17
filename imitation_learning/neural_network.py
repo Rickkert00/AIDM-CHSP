@@ -4,11 +4,11 @@ class BoundPredictor(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(3785, 500)
+        self.fc1 = nn.Linear(3, 300)
         self.relu1 = nn.ReLU()
-        self.fc2 = nn.Linear(500, 500)
+        self.fc2 = nn.Linear(300, 300)
         self.relu2 = nn.ReLU()
-        self.fc3 = nn.Linear(500, 1)
+        self.fc3 = nn.Linear(300, 1)
 
     def forward(self, x):
         x = self.fc1(x)

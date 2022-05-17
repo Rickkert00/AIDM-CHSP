@@ -68,9 +68,3 @@ if __name__ == '__main__':
     print(instance)
     predictor = BoundPredictor()
     summary(predictor, (200, 3785))
-
-
-
-
-
-
