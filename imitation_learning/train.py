@@ -4,12 +4,13 @@ import os
 import time
 from random import random
 
+import dgl
 import numpy as np
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 
-from imitation_learning.neural_network import BoundPredictor
+from imitation_learning.neural_network import BoundPredictor, RemovalTimePredictor
 
 
 def parse_args(_args=None):
@@ -82,12 +83,10 @@ def train(train_loader, model, optimizer, criterion, device):
     return avg_loss.item() / len(train_loader)#, 100 * correct / total
 
 def load_data(folder, training_size=0.8):
-    files = os.listdir(folder)
-    files = sorted(files)
     input_data = []
     solved_all = []
     input_keys = ['multiplier', 'hoist', 'jobs']
-    solution_keys = ['objective']
+    solution_keys = ['r']
 
     solutions_and_input = np.load('../chsp-generators-main/instances/linear_solutions.npy', allow_pickle=True)
     input_data = solutions_and_input[:,0]
@@ -99,8 +98,19 @@ def load_data(folder, training_size=0.8):
     #        [ 0,  6, 12, 18]]), 'emptys': [6, 6, 6, 6]}
     use_keys = 'Ninner' # example use.
     # Doesnt work yet!!!!!!!!!!!
+    num_nodes = [torch.from_numpy(np.array(input['Ninner'])).float() for input in input_data]
+    num_node_feats, num_edge_feats = 3, 1 # tmin, tmax and f for node, e for edge
+
+    # fully connected adj matrix with weights # TODO include self connection or not?
+    adjs = [torch.ones((int(num_tanks.item()), int(num_tanks.item()))) for num_tanks in num_nodes] # binarize to obtain adjecency matrix
+    structure = list(zip([torch.nonzero(adj, as_tuple=True) for adj in adjs])) # edges list
+    graph = [dgl.graph((u_v[0][0], u_v[0][1])) for u_v in structure]
+
+    node_feats = [[torch.from_numpy(np.array([input['tmin'][idx], input['tmax'][idx], input['f'][idx]])) for idx in range(int(num_nodes[i].item()))] for i, input in enumerate(input_data)] # need to have 3 features per node, and num_nodes nodes per problem
+    edge_feats = [torch.from_numpy(np.array(input['e'])) for input in input_data] # TODO implement edge_feats, and convert that to usable dateloader instances
+
     input_data = [torch.from_numpy(d).float() for d in np.array(input_data)]
-    solved = [torch.from_numpy(np.array(d)).float().unsqueeze(dim=0) for d in solved_all['obj']]
+    solved = [torch.from_numpy(np.array(d)).float().unsqueeze(dim=0) for d in solutions['r']]
     length = len(input_data)
     training_length = int(length * training_size)
     training = [(input_data[i], solved[i]) for i in range(training_length)]
@@ -135,7 +145,7 @@ def main(_args=None):
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
-    model = BoundPredictor()
+    model = RemovalTimePredictor()
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), args.learning_rate)#, weight_decay=args.weight_decay)
 

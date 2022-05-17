@@ -25,3 +25,6 @@ We therefore suggest padding until 5*16 = 80, as with this input size we can cov
 80 is maybe too large, too many input params?, try 60, as BO1 has 12 tanks, considering multiplier of 5
 
 Problem: how to smartly reduce number of input parameters? (ask Neil)
+
+
+We think that using either hashing or Graph Neural Networks can help with this varying output.
