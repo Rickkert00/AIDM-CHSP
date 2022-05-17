@@ -178,7 +178,7 @@ def simple_processing_times(number_of_tanks):
     list_of_min_max_times = []
 
     for i in range(number_of_tanks):
-        min_time = random.randint(30, 35)
+        min_time = random.randint(30, 50)
         max_time = random.randint(55, 100)
         list_of_min_max_times.append((min_time, max_time))
     return list_of_min_max_times
