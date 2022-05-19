@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import time
-from random import random
 
 import dgl
 import numpy as np
@@ -10,14 +9,14 @@ import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 
-from imitation_learning.neural_network import BoundPredictor, RemovalTimePredictor
+from imitation_learning.neural_network import RemovalTimePredictor
 
 
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
     parser.add_argument('--num_train_steps', default=1000000, type=int)
-    parser.add_argument('--batch_size', default=2, type=int)
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
     parser.add_argument('--learning_rate', default=1e-3, type=float)
     # misc
@@ -29,6 +28,7 @@ def parse_args(_args=None):
     args = parser.parse_args(_args)
     return args
 
+
 def make_dir(dir_path):
     try:
         os.makedirs(dir_path, exist_ok=True)
@@ -36,11 +36,13 @@ def make_dir(dir_path):
         pass
     return dir_path
 
+
 def set_seed_everywhere(seed):
-  torch.manual_seed(seed)
-  if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(seed)
-  np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+
 
 def train(train_loader, model, optimizer, criterion, device):
     """
@@ -51,7 +53,7 @@ def train(train_loader, model, optimizer, criterion, device):
         optimizer: Optimizer (e.g. SGD).
         criterion: Loss function (e.g. cross-entropy loss).
     """
-    model.train() # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
+    model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
 
     avg_loss = 0
     correct = 0
@@ -60,17 +62,18 @@ def train(train_loader, model, optimizer, criterion, device):
     # Iterate through batches
     for i, data in enumerate(train_loader):
         # Get the inputs; data is a list of [inputs, labels]
-        inputs, labels = data
+        (graph_inputs, node_inputs, edge_inputs), labels = data
         # Move data to target device
-        inputs, labels = inputs.to(device), labels.to(device)
+        node_inputs, edge_inputs, labels = node_inputs.to(device), edge_inputs.to(device), labels.to(device)
 
         # Zero the parameter gradients
         optimizer.zero_grad()
 
         # Forward + backward + optimize
-        period = model(inputs)
+        period, _ = model(graph_inputs, node_inputs, edge_inputs)
 
-        loss = criterion(period, labels)
+        # TODO find out why all values of period tensor are equivalent
+        loss = criterion(period[-1].squeeze(0), labels)  # calculate on the last tensor as that is the final tank
 
         loss.backward()
         optimizer.step()
@@ -80,42 +83,88 @@ def train(train_loader, model, optimizer, criterion, device):
         total += labels.size(0)
         # correct += torch.isclose(points_in_image.data, labels_in_image, atol=2).sum().item() // 8
 
-    return avg_loss.item() / len(train_loader)#, 100 * correct / total
+    return avg_loss.item() / len(train_loader)  # , 100 * correct / total
 
-def load_data(folder, training_size=0.8):
-    input_data = []
-    solved_all = []
-    input_keys = ['multiplier', 'hoist', 'jobs']
-    solution_keys = ['r']
 
+def load_graph_data(device, training_size=0.8):
     solutions_and_input = np.load('../chsp-generators-main/instances/linear_solutions.npy', allow_pickle=True)
-    input_data = solutions_and_input[:,0]
-    solutions = solutions_and_input[:,1]
-
-    # input_data[0]: {'Ninner': 3, 'tmin': [78, 114, 359], 'tmax': [112, 162, 473], 'f': [11, 12, 11, 11], 'e': array([[ 6,  0,  6, 12],
-    #        [12,  6,  0,  6],
-    #        [18, 12,  6,  0],
-    #        [ 0,  6, 12, 18]]), 'emptys': [6, 6, 6, 6]}
-    use_keys = 'Ninner' # example use.
-    # Doesnt work yet!!!!!!!!!!!
+    input_data = solutions_and_input[:, 0]
+    solutions = solutions_and_input[:, 1]
     num_nodes = [torch.from_numpy(np.array(input['Ninner'])).float() for input in input_data]
-    num_node_feats, num_edge_feats = 3, 1 # tmin, tmax and f for node, e for edge
 
-    # fully connected adj matrix with weights # TODO include self connection or not?
-    adjs = [torch.ones((int(num_tanks.item()), int(num_tanks.item()))) for num_tanks in num_nodes] # binarize to obtain adjecency matrix
-    structure = list(zip([torch.nonzero(adj, as_tuple=True) for adj in adjs])) # edges list
-    graph = [dgl.graph((u_v[0][0], u_v[0][1])) for u_v in structure]
+    # fully connected adj matrix with weights, including self connections
+    adjs = [torch.ones((int(num_tanks.item()), int(num_tanks.item()))) for num_tanks in
+            num_nodes]  # obtain adjacency matrix
+    # structure format: (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2]), tensor([0, 1, 2, 0, 1, 2, 0, 1, 2]))
+    # so structure[0][0] and structure[1][0] are connected etc.
+    structure = list(zip([torch.nonzero(adj, as_tuple=True) for adj in
+                          adjs]))  # edges list, 2 lists that indicate what nodes are connected
+    graphs = [dgl.graph((u_v[0][0], u_v[0][1]), device=device) for u_v in structure]
 
-    node_feats = [[torch.from_numpy(np.array([input['tmin'][idx], input['tmax'][idx], input['f'][idx]])) for idx in range(int(num_nodes[i].item()))] for i, input in enumerate(input_data)] # need to have 3 features per node, and num_nodes nodes per problem
-    edge_feats = [torch.from_numpy(np.array(input['e'])) for input in input_data] # TODO implement edge_feats, and convert that to usable dateloader instances
+    # offset input variable 'f' time as by 1 as f[0] is from initial stage to first tank, need to add that later
+    node_feats = [[torch.from_numpy(np.array([input['tmin'][idx], input['tmax'][idx], input['f'][idx + 1]])) for idx in
+                   range(int(num_nodes[i].item()))] for i, input in
+                  enumerate(input_data)]  # need to have 3 features per node, and num_nodes nodes per problem
+    # convert node_feats to correct input shape and format
+    corr_node_feats = []
+    for tensors in node_feats:
+        corr_node_feats.append(torch.stack(tensors, dim=0))
+        corr_node_feats[-1] = corr_node_feats[-1].type(torch.float32)
+    edge_feats = []
+    # 'e' input param format: [[6  0  6 12], [12  6  0  6], [18 12  6  0], [0  6 12 18]] for 1 example instance
+    for idx, input in enumerate(input_data):
+        edge_feat = []
+        for edge_num in range(int(num_nodes[idx].item())):
+            # we construct the edge features
+            edge_array = input['e']
+            # need to extract correct indices, skipping index 1 as that is from stage 0
+            edge_feat.extend(edge_array[edge_num][1:])
+            # TODO ADD INITIAL STAGE 0 TIMES!!
+        float_edges = torch.Tensor(edge_feat).reshape(-1, 1)
+        edge_feats.append(float_edges)
 
-    input_data = [torch.from_numpy(d).float() for d in np.array(input_data)]
-    solved = [torch.from_numpy(np.array(d)).float().unsqueeze(dim=0) for d in solutions['r']]
+    # TODO add initial stage 0 and final stage
+    input_data = [(graphs[i], corr_node_feats[i], edge_feats[i]) for i in range(len(input_data))] # convert input into 1 tuple
+    solved = [torch.from_numpy(np.array(d['objective'])).float().unsqueeze(dim=0) for d in
+              solutions]  # TODO change this to 'r' if we want to train using removal times
     length = len(input_data)
+    # TODO is this a good split? maybe use random split instead of this
     training_length = int(length * training_size)
     training = [(input_data[i], solved[i]) for i in range(training_length)]
-    test = [(input_data[i], solved[i]) for i in range(training_length,length)]
+    test = [(input_data[i], solved[i]) for i in range(training_length, length)]
     return training, test
+
+
+def collate_fn(batches):
+    """
+    Custom function for creating batches of training samples, right now this will construct batches of
+    size 1, as we cannot have batches > size 1 because of varying input size.
+    :param batches: Tuple of input and output pairs that should be merged into a batch
+    :return: returns the batched input samples
+    """
+    graphs = []
+    node_f = None
+    edge_f = None
+    labels = None
+    for batch in batches:  # this will be batch size 1 for graph network
+        node_features = batch[0][1]
+        edge_features = batch[0][2]
+        label = batch[1]
+        graphs = batch[0][0]
+        if node_f is None:
+            node_f = node_features
+        if labels is None:
+            labels = label
+        if edge_f is None:
+            edge_f = edge_features
+            continue
+        else:
+            torch.stack((node_f, node_features), dim=0)
+            torch.stack((edge_f, edge_features), dim=0)
+            torch.stack((labels, label), dim=0)
+
+    return (graphs, node_f, edge_f), labels
+
 
 def main(_args=None):
     print("args", _args)
@@ -141,23 +190,21 @@ def main(_args=None):
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cpu')
     folder = '../chsp-generators-main/instances/linear_solutions/'
-    train_set, test_set = load_data(folder)
-    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+    train_set, test_set = load_graph_data(device)
+    train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
 
     model = RemovalTimePredictor()
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), args.learning_rate)#, weight_decay=args.weight_decay)
+    optimizer = optim.Adam(model.parameters(), args.learning_rate)  # , weight_decay=args.weight_decay)
 
     for i in range(args.epochs):
         loss = train(train_loader, model, optimizer, criterion, device)
         print(loss)
     # if args.model_dir is not None:
     #   pass
-        # agent.load(args.model_dir, args.model_step)
+    # agent.load(args.model_dir, args.model_step)
     # L = Logger(args.work_dir, use_tb=args.save_tb)
-
-
 
 
 if __name__ == '__main__':

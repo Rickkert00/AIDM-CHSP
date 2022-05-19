@@ -1,13 +1,10 @@
+import dgl.function as fn
 import torch
-from torch import nn
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
+from dgl.nn.functional import edge_softmax
 from torch import nn
 from torch.nn import init
-import dgl.function as fn
-from dgl.nn.functional import edge_softmax
-
-
 
 
 class EGATConv(nn.Module):
@@ -170,6 +167,7 @@ class EGATConv(nn.Module):
             else:
                 return h_out, f_out
 
+
 class BoundPredictor(nn.Module):
 
     def __init__(self):
@@ -188,30 +186,45 @@ class BoundPredictor(nn.Module):
         x = self.fc3(x)
         return x
 
-class RemovalTimePredictor(nn.Module):
 
-    def __init(self): # TODO find out out_features optimal sizes
+class RemovalTimePredictor(nn.Module):
+    """
+    Network architecture based on the GAT architecture with edge features. This architecture also used multiple
+    GAT layers which is why I used it here together with normalization and nonlinearities. They recommended ReLU,
+    batchNorm is something i came up with myself (which is probably not useful since batch_size = 1 for us)
+    """
+
+    def __init__(self):  # TODO find out out_features optimal sizes
         super().__init__()
         self.egat1 = EGATConv(3, 1, 3, 1, 3, bias=True)
         self.norm1_nodes = nn.BatchNorm1d(3)  # TODO find what normalization works best
         self.norm1_edges = nn.BatchNorm1d(3)
         self.relu1 = nn.ReLU()
-        self.egat2 = EGATConv(3,1,3,1,3, bias=True)
+
+        self.egat2_input_size_edges = 1 * 3  # times 3 because we use 3 attention heads
+        self.egat2_input_size_nodes = 3 * 3
+        self.egat2 = EGATConv(self.egat2_input_size_nodes, self.egat2_input_size_edges, 3, 1, 3, bias=True)
         self.norm2_nodes = nn.BatchNorm1d(3)
         self.norm2_edges = nn.BatchNorm1d(3)
-        self.egat3 = EGATConv(3,1,1,1,3,bias=True)
+        self.egat3_input_size_edges = 1 * 3  # again times 3 as we use 3 heads in 2nd gat layer
+        self.egat3_input_size_nodes = 3 * 3
+        self.egat3 = EGATConv(self.egat3_input_size_nodes, self.egat3_input_size_edges, 1, 1, 1, bias=True)
 
     def forward(self, graph, node_f, edge_f):
-        new_node_feats, new_edge_feats = self.egat1(graph, node_f, edge_f)  # N x Heads x out_feats
+        new_node_feats, new_edge_feats = self.egat1(graph, node_f, edge_f)  # output shape: N x Heads x out_feats
         new_node_feats = self.norm1_nodes(new_node_feats)
         new_edge_feats = self.norm1_edges(new_edge_feats)
         new_node_feats = self.relu1(new_node_feats)
         new_edge_feats = self.relu1(new_edge_feats)
+        # we flatten the multi heads into 1 dimension such that we can apply the GAT again:
+        new_node_feats = new_node_feats.reshape(-1, self.egat2_input_size_nodes)
+        new_edge_feats = new_edge_feats.reshape(-1, self.egat2_input_size_edges)
         new_node_feats, new_edge_feats = self.egat2(graph, new_node_feats, new_edge_feats)
         new_node_feats = self.norm2_nodes(new_node_feats)
         new_edge_feats = self.norm2_edges(new_edge_feats)
         new_node_feats = self.relu1(new_node_feats)
         new_edge_feats = self.relu1(new_edge_feats)
+        new_node_feats = new_node_feats.reshape(-1, self.egat3_input_size_nodes)
+        new_edge_feats = new_edge_feats.reshape(-1, self.egat3_input_size_edges)
         new_node_feats, new_edge_feats = self.egat3(graph, new_node_feats, new_edge_feats)
         return new_node_feats, new_edge_feats
-
