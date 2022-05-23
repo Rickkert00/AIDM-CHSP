@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from imitation_learning.neural_network import RemovalTimePredictor
 
+INF = 9999
 
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
@@ -93,8 +94,8 @@ def load_graph_data(device, training_size=0.8):
     num_nodes = [torch.from_numpy(np.array(input['Ninner'])).float() for input in input_data]
 
     # fully connected adj matrix with weights, including self connections
-    adjs = [torch.ones((int(num_tanks.item()), int(num_tanks.item()))) for num_tanks in
-            num_nodes]  # obtain adjacency matrix
+    adjs = [torch.ones((int(num_tanks.item()+2), int(num_tanks.item()+2))) for num_tanks in
+            num_nodes]  # obtain adjacency matrix, add 2 extra as we need start and end node
     # structure format: (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2]), tensor([0, 1, 2, 0, 1, 2, 0, 1, 2]))
     # so structure[0][0] and structure[1][0] are connected etc.
     structure = list(zip([torch.nonzero(adj, as_tuple=True) for adj in
@@ -102,9 +103,14 @@ def load_graph_data(device, training_size=0.8):
     graphs = [dgl.graph((u_v[0][0], u_v[0][1]), device=device) for u_v in structure]
 
     # offset input variable 'f' time as by 1 as f[0] is from initial stage to first tank, need to add that later
-    node_feats = [[torch.from_numpy(np.array([input['tmin'][idx], input['tmax'][idx], input['f'][idx + 1]])) for idx in
-                   range(int(num_nodes[i].item()))] for i, input in
-                  enumerate(input_data)]  # need to have 3 features per node, and num_nodes nodes per problem
+    node_feats = [[torch.from_numpy(np.array([0, INF, input['f'][idx]])) if idx == 0
+                   else torch.from_numpy(np.array([input['tmin'][idx-1], input['tmax'][idx-1], input['f'][idx]]))
+                   for idx in range(int(num_nodes[i].item())+1)]
+                   for i, input in enumerate(input_data)]  # need to have 3 features per node, and num_nodes nodes per problem. We add a start node already in this loop
+    # now need to add final node
+    for node_feat in node_feats:
+        node_feat.append(torch.from_numpy(np.array([0, INF, 0]))) # Add ending node
+
     # convert node_feats to correct input shape and format
     corr_node_feats = []
     for tensors in node_feats:
@@ -112,18 +118,22 @@ def load_graph_data(device, training_size=0.8):
         corr_node_feats[-1] = corr_node_feats[-1].type(torch.float32)
     edge_feats = []
     # 'e' input param format: [[6  0  6 12], [12  6  0  6], [18 12  6  0], [0  6 12 18]] for 1 example instance
+    # corr format would be: [0,6,12,18,0,6,0,6,12,0,12,6,0,6,0,0,0,0,0,0]
     for idx, input in enumerate(input_data):
         edge_feat = []
-        for edge_num in range(int(num_nodes[idx].item())):
-            # we construct the edge features
-            edge_array = input['e']
-            # need to extract correct indices, skipping index 1 as that is from stage 0
-            edge_feat.extend(edge_array[edge_num][1:])
-            # TODO ADD INITIAL STAGE 0 TIMES!!
+        edge_array = input['e']
+        # add start stage
+        edge_feat.extend(np.append(edge_array[-1], 0))
+        for edge_num in range(int(num_nodes[idx].item())): # also include starting stage
+            # add in between stages
+            edge_feat.extend(np.append(edge_array[edge_num], 0))
+        # add final stage
+        edge_feat.extend(np.array([0 for _ in range(int(num_nodes[idx].item()) + 2)]))
+
+        # add edges to final stage
         float_edges = torch.Tensor(edge_feat).reshape(-1, 1)
         edge_feats.append(float_edges)
 
-    # TODO add initial stage 0 and final stage
     input_data = [(graphs[i], corr_node_feats[i], edge_feats[i]) for i in range(len(input_data))] # convert input into 1 tuple
     solved = [torch.from_numpy(np.array(d['objective'])).float().unsqueeze(dim=0) for d in
               solutions]  # TODO change this to 'r' if we want to train using removal times
