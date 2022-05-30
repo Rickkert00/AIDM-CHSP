@@ -45,7 +45,7 @@ def set_seed_everywhere(seed):
     np.random.seed(seed)
 
 
-def train(train_loader, model, optimizer, criterion, device):
+def train(train_loader, model, optimizer, criterion, device, test_loader):
     """
     Trains network for one epoch in batches.
     Args:
@@ -56,33 +56,69 @@ def train(train_loader, model, optimizer, criterion, device):
     """
     model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
 
-    avg_loss = 0
-    correct = 0
+    total_train_loss = 0
+    absolute_values = [1, 2, 4, 8, 16, 32, 64]
+    scaling_values = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32]
+    total_train_accuracy_absolute = {k: 0 for k in absolute_values}
+    total_train_accuracy_scaling = {k: 0 for k in scaling_values}
+    avg_train_accuracy_absolute = {k: 0 for k in absolute_values}
+    avg_train_accuracy_scaling = {k: 0 for k in scaling_values}
     total = 0
 
     # Iterate through batches
     for i, data in enumerate(train_loader):
         # Get the inputs; data is a list of [inputs, labels]
-        (graph_inputs, node_inputs, edge_inputs), labels = data
+        (graph_inputs, node_inputs, edge_inputs), (removal_times_gt, period_gt) = data
         # Move data to target device
-        node_inputs, edge_inputs, labels = node_inputs.to(device), edge_inputs.to(device), labels.to(device)
+        node_inputs, edge_inputs, removal_times = node_inputs.to(device), edge_inputs.to(device), removal_times_gt.to(device)
 
         # Zero the parameter gradients
         optimizer.zero_grad()
 
         # Forward + backward + optimize
-        period, _ = model(graph_inputs, node_inputs, edge_inputs)
-
+        removal_times, _ = model(graph_inputs, node_inputs, edge_inputs)
+        removal_times = removal_times.squeeze(-1)
+        if removal_times[1:-1].shape != removal_times_gt.shape:
+            print("WRONG SHAPE")
+        # print(removal_times)
         # TODO find out why all values of period tensor are equivalent
-        loss = criterion(period[-1].squeeze(0), labels)  # calculate on the last tensor as that is the final tank
-
+        # loss = criterion(period[-1].squeeze(0), labels)  # calculate on the last tensor as that is the final tank
+        loss = criterion(removal_times[1:-1], removal_times_gt)
         loss.backward()
         optimizer.step()
 
         # Keep track of loss and accuracy
-        avg_loss += loss
-        total += labels.size(0)
-        # correct += torch.isclose(points_in_image.data, labels_in_image, atol=2).sum().item() // 8
+        total_train_loss += loss
+        for k in total_train_accuracy_absolute:
+            total_train_accuracy_absolute[k] += (torch.isclose(removal_times[1:-1], removal_times_gt, atol=k, rtol=0).sum().item() / removal_times_gt.size(0))
+        for k in total_train_accuracy_scaling:
+            total_train_accuracy_absolute[k] += (torch.isclose(removal_times[1:-1], removal_times_gt, atol=k*period_gt,
+                                                               rtol=0).sum().item() / removal_times_gt.size(0))
+
+    for k in total_train_accuracy_absolute:
+        avg_train_accuracy_absolute[k] = total_train_accuracy_absolute[k] / len(train_loader)
+    for k in total_train_accuracy_scaling:
+        avg_train_accuracy_scaling[k] = total_train_accuracy_scaling[k] / len(train_loader)
+    avg_train_loss = total_train_loss.item() / len(train_loader)
+    # calculate test loss
+    model.eval()
+    with torch.no_grad():
+        accuracy = 0
+        total_test_loss = 0
+        total_test_accuracy = 0
+        avg_loss = 0
+        for i, data in enumerate(test_loader):
+            # get inputs
+            (graph_inputs, node_inputs, edge_inputs), labels = data
+            # Move data to target device
+            node_inputs, edge_inputs, labels = node_inputs.to(device), edge_inputs.to(device), labels.to(device)
+            # Forward + backward
+            removal_times, _ = model(graph_inputs, node_inputs, edge_inputs)
+            removal_times = removal_times.squeeze(-1)
+            loss = criterion(removal_times[1:-1], labels)
+            total_test_loss += loss
+            total += labels.size(0)
+    avg_test_loss = total_test_loss.item() / len(test_loader)
 
     return avg_loss.item() / len(train_loader)  # , 100 * correct / total
 
@@ -135,8 +171,10 @@ def load_graph_data(device, training_size=0.8):
         edge_feats.append(float_edges)
 
     input_data = [(graphs[i], corr_node_feats[i], edge_feats[i]) for i in range(len(input_data))] # convert input into 1 tuple
-    solved = [torch.from_numpy(np.array(d['objective'])).float().unsqueeze(dim=0) for d in
-              solutions]  # TODO change this to 'r' if we want to train using removal times
+    # TODO change this to 'r' if we want to train using removal times
+    solved = [(torch.from_numpy(np.array(d['r'][1:])).float().unsqueeze(dim=0).reshape(-1,1), torch.from_numpy(np.array(d['objective'][1:])).float().unsqueeze(dim=0)) for d in
+              solutions] # we do not include the first element of the tensor as that is always 0 in all solutions ( we move from the initial stage as we start)
+
     length = len(input_data)
     # TODO is this a good split? maybe use random split instead of this
     training_length = int(length * training_size)
@@ -202,15 +240,19 @@ def main(_args=None):
     folder = '../chsp-generators-main/instances/linear_solutions/'
     train_set, test_set = load_graph_data(device)
     train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
-    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
 
     model = RemovalTimePredictor()
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), args.learning_rate)  # , weight_decay=args.weight_decay)
 
     for i in range(args.epochs):
-        loss = train(train_loader, model, optimizer, criterion, device)
+        loss = train(train_loader, model, optimizer, criterion, device, test_loader)
         print(loss)
+
+    # save weights
+    PATH = '/gnn_weights.pth'
+    torch.save(model.state_dict(), args.work_dir + PATH)
     # if args.model_dir is not None:
     #   pass
     # agent.load(args.model_dir, args.model_step)

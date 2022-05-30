@@ -196,18 +196,19 @@ class RemovalTimePredictor(nn.Module):
 
     def __init__(self):  # TODO find out out_features optimal sizes
         super().__init__()
-        self.egat1 = EGATConv(3, 1, 3, 1, 3, bias=True)
-        self.norm1_nodes = nn.BatchNorm1d(3)  # TODO find what normalization works best
-        self.norm1_edges = nn.BatchNorm1d(3)
+        num_heads = 20
+        self.egat1 = EGATConv(3, 1, 3, 1, num_heads, bias=True)
+        self.norm1_nodes = nn.BatchNorm1d(num_heads)  # TODO find what normalization works best
+        self.norm1_edges = nn.BatchNorm1d(num_heads)
         self.relu1 = nn.ReLU()
 
-        self.egat2_input_size_edges = 1 * 3  # times 3 because we use 3 attention heads
-        self.egat2_input_size_nodes = 3 * 3
-        self.egat2 = EGATConv(self.egat2_input_size_nodes, self.egat2_input_size_edges, 3, 1, 3, bias=True)
-        self.norm2_nodes = nn.BatchNorm1d(3)
-        self.norm2_edges = nn.BatchNorm1d(3)
-        self.egat3_input_size_edges = 1 * 3  # again times 3 as we use 3 heads in 2nd gat layer
-        self.egat3_input_size_nodes = 3 * 3
+        self.egat2_input_size_edges = 1 * num_heads  # times 3 because we use 3 attention heads
+        self.egat2_input_size_nodes = 3 * num_heads
+        self.egat2 = EGATConv(self.egat2_input_size_nodes, self.egat2_input_size_edges, 3, 1, num_heads, bias=True)
+        self.norm2_nodes = nn.BatchNorm1d(num_heads)
+        self.norm2_edges = nn.BatchNorm1d(num_heads)
+        self.egat3_input_size_edges = 1 * num_heads  # again times 3 as we use 3 heads in 2nd gat layer
+        self.egat3_input_size_nodes = 3 * num_heads
         self.egat3 = EGATConv(self.egat3_input_size_nodes, self.egat3_input_size_edges, 1, 1, 1, bias=True)
 
     def forward(self, graph, node_f, edge_f):
