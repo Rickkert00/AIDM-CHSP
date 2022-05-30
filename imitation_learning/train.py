@@ -107,11 +107,11 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
     return avg_loss.item() / len(data_loader), 100 * correct / total
 
 
-def load_graph_data(training_size=0.8, predict_period=False):
-    solutions_and_input = np.load('../chsp-generators-main/instances/linear_solutions.npy', allow_pickle=True)
+def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False):
+    solutions_and_input = np.load(path, allow_pickle=True)
     input_data = solutions_and_input[:, 0]
     solutions = solutions_and_input[:, 1]
-    num_nodes = [torch.from_numpy(np.array(input['Ninner'])).float() for input in input_data]
+    num_nodes = [torch.tensor(input['Ninner']).float() for input in input_data]
 
     # fully connected adj matrix with weights, including self connections
     adjs = [torch.ones((int(num_tanks.item() + 2), int(num_tanks.item() + 2))) for num_tanks in
@@ -119,24 +119,24 @@ def load_graph_data(training_size=0.8, predict_period=False):
     # structure format: (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2]), tensor([0, 1, 2, 0, 1, 2, 0, 1, 2]))
     # so structure[0][0] and structure[1][0] are connected etc.
     max = 99999
+    # top_layers = [torch.nonzero(torch.ones(num_tanks), as_tuple=True)+num_tanks for num_tanks in
+    #         num_nodes]
     structure = list(zip([torch.nonzero(adj, as_tuple=True) for adj in
                           adjs]))  # edges list, 2 lists that indicate what nodes are connected
     graphs = [dgl.graph((u_v[0][0], u_v[0][1])) for u_v in structure]
     # offset input variable 'f' time as by 1 as f[0] is from initial stage to first tank, need to add that later
-    node_feats = [[torch.from_numpy(np.array([0, max, input['f'][idx]])) if idx == 0
-                   else torch.from_numpy(np.array([input['tmin'][idx - 1], input['tmax'][idx - 1], input['f'][idx]]))
+    node_feats = [[torch.tensor([0, max, input['f'][idx]]) if idx == 0
+                   else torch.tensor([input['tmin'][idx - 1], input['tmax'][idx - 1], input['f'][idx]])
                    for idx in range(int(num_nodes[i].item()) + 1)]
-                  for i, input in
-                  enumerate(
-                      input_data)]  # need to have 3 features per node, and num_nodes nodes per problem. We add a start node already in this loop
+                  for i, input in enumerate(input_data)] # need to have 3 features per node, and num_nodes nodes per problem. We add a start node already in this loop
     # now need to add final node
     for node_feat in node_feats:
-        node_feat.append(torch.from_numpy(np.array([0, max, 0])))  # Add ending node
+        node_feat.append(torch.tensor([0, max, 0]))  # Add ending node
 
     # convert node_feats to correct input shape and format
     corr_node_feats = []
     for tensors in node_feats:
-        corr_node_feats.append(torch.stack(tensors, dim=0).type(torch.float32))
+        corr_node_feats.append(torch.stack(tensors, dim=0).float())
     edge_feats = []
     # 'e' input param format: [[6  0  6 12], [12  6  0  6], [18 12  6  0], [0  6 12 18]] for 1 example instance
     # corr format would be: [0,6,12,18,0,6,0,6,12,0,12,6,0,6,0,0,0,0,0,0]
@@ -161,7 +161,7 @@ def load_graph_data(training_size=0.8, predict_period=False):
     label = 'r'
     if predict_period:
         label = 'objective'
-    solved = [torch.from_numpy(np.array(d[label][1:]+[d['objective']])).float().unsqueeze(dim=0) for d in solutions]
+    solved = [torch.tensor(d[label][1:]+[d['objective']]).float().unsqueeze(dim=0) for d in solutions]
     length = len(input_data)
     # TODO is this a good split? maybe use random split instead of this
     training_length = int(length * training_size)
@@ -187,7 +187,7 @@ def collate_fn(batches):
 
 # best so far May27_23-04-50
 def main(_args=None):
-    debug = False
+    debug = True
     print("args", _args)
     args = parse_args(_args)
     if args.seed == -1:
@@ -208,7 +208,7 @@ def main(_args=None):
     with open(os.path.join(args.work_dir, 'args.json'), 'w') as f:
         json.dump(vars(args), f, sort_keys=True, indent=4)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and not debug else 'cpu')
     # device = torch.device('cpu')  # Use cpu to debug faster
     print("Using device:", device)
     train_set, test_set = load_graph_data()
