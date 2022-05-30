@@ -6,3 +6,7 @@ jupyter
 iminizinc
 gurobipy
 dgl
+tensorboard
+torch-geometric
+torch-sparse
+protobuf~=3.19.0
