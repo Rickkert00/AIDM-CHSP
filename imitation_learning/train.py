@@ -10,10 +10,9 @@ import torch
 from torch import nn, optim
 from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader, random_split, IterableDataset
-from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
 
-from imitation_learning.neural_network import RemovalTimePredictor
+from imitation_learning.neural_network_2 import RemovalTimePredictor
 
 INF = 9999
 
@@ -40,13 +39,13 @@ def parse_args(_args=None):
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
     parser.add_argument('--learning_rate', default=3e-3, type=float)
-    parser.add_argument('--decay', default=0.995, type=float)
+    parser.add_argument('--decay', default=1, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
 
     parser.add_argument('--log_interval', default=100, type=int)
     parser.add_argument('--work_dir', default='work_dir', type=str)
-    parser.add_argument('--epochs', default=10000, type=int)
+    parser.add_argument('--epochs', default=5000, type=int)
     args = parser.parse_args(_args)
     return args
 
