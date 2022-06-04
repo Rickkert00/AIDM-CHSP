@@ -7,7 +7,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+imitation_learning/runs/
 .idea
 # Distribution / packaging
 .Python
@@ -28,7 +28,7 @@ var/
 *.egg
 
 /chsp-generators-main/instances/
-
+imitation_learning/work_dir
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
