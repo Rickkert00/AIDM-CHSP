@@ -205,11 +205,16 @@ class RemovalTimePredictor(nn.Module):
         edge_features = 3
         node_features = 3
         heads = 60
-        self.egat1, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
-        self.egat2, self.output_shape2 = gnn_block(inputs=self.output_shape1, outputs=(node_features,edge_features), heads=heads)
-        # self.egat3, self.output_shape3 = gnn_block(inputs=self.output_shape2, outputs=(node_features,edge_features), heads=heads)
-        # self.egat4, self.output_shape3 = gnn_block(inputs=self.output_shape2, outputs=(node_features,edge_features), heads=heads)
-        self.egat_final, _ = gnn_block(inputs=self.output_shape2, outputs=(1, 1), heads=1)
+        self.layers = []
+        egat, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
+        self.layers.append(egat)
+        layers = 7
+        last_output_shape = self.output_shape1
+        for i in range(layers):
+            egat, last_output_shape = gnn_block(inputs=last_output_shape, outputs=(node_features,edge_features), heads=heads)
+            self.hidden_layers.append(egat)
+        egat_final, _ = gnn_block(inputs=last_output_shape, outputs=(1, 1), heads=1)
+        self.layers.append(egat_final)
 
     def _forward_layer(self, graph, node_f, edge_f, gnn):
         new_node_feats, new_edge_feats = gnn(graph, node_f, edge_f)  # output shape: N x Heads x out_feats
@@ -221,10 +226,7 @@ class RemovalTimePredictor(nn.Module):
         return new_node_feats, new_edge_feats
 
     def forward(self, graph, node_f, edge_f):
-        new_node_feats, new_edge_feats = self._forward_layer(graph, node_f, edge_f, self.egat1)  # output shape: N x Heads x out_feats
-        new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, self.egat2)
-        # new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, self.egat3)
-        # new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, self.egat4)
-
-        new_node_feats, new_edge_feats = self.egat_final(graph, new_node_feats, new_edge_feats)
+        new_node_feats, new_edge_feats = node_f, edge_f
+        for egat in self.layers:
+            new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, egat)
         return new_node_feats, new_edge_feats

@@ -109,6 +109,7 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
 
 def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False):
     solutions_and_input = np.load(path, allow_pickle=True)
+    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None])
     input_data = solutions_and_input[:, 0]
     solutions = solutions_and_input[:, 1]
     num_nodes = [torch.tensor(input['Ninner']).float() for input in input_data]

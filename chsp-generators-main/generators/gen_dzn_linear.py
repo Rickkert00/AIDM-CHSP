@@ -135,17 +135,21 @@ def generateRandomProblems(save_np=False):
     variability = ["small", "large"]
     timeRange = ["fixed", "small", "large"]
     inst = 0
-    instances = []
+    instances = {}
     base_path = "../instances/linear"
-    for rounds, tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability in itertools.product(range(1, 4), range(3, 25), processingTimeScale,
-                                                                                                                     similarity, variability, timeRange, variability):
+    for rounds, tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability in itertools.product(
+            range(1, 4), range(3, 25), processingTimeScale, similarity, variability, timeRange, variability):
         inst += 1
-        problem = generate_problem(tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability, save_np)
-        filename = f"{base_path}/{inst}.dzn"
+        vars = tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability
+        problem = generate_problem(*vars, save_np)
         if save_np:
-          instances.append(problem)
+            instances[str(vars)] = problem
+            if inst % 10 == 1:
+                print(f"Saving with instances {inst}")
+                np.save(base_path + "problems.npy", instances)
         else:
-          save_problem_to_file(filename, *list(problem.values()))
+            filename = f"{base_path}/{inst}.dzn"
+            save_problem_to_file(filename, *list(problem.values()))
     if save_np:
         print("save np")
         np.save(base_path + "problems.npy", instances)
