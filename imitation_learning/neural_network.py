@@ -4,8 +4,11 @@ import torch
 # pylint: disable= no-member, arguments-differ, invalid-name
 import torch as th
 from dgl.nn.functional import edge_softmax
+from dgl.nn.pytorch import SGConv
 from torch import nn
 from torch.nn import init
+
+from imitation_learning.gcn import GCN
 
 
 class EGATConv(nn.Module):
@@ -198,17 +201,27 @@ class RemovalTimePredictor(nn.Module):
     def __init__(self):  # TODO find out out_features optimal sizes
         super().__init__()
         self.relu1 = nn.ReLU()
+        from dgl.nn import GATv2Conv
         def gnn_block(inputs, outputs, heads):
-            egat = EGATConv(*inputs, *outputs, heads, bias=True)
+            gnn = EGATConv(*inputs, *outputs, heads, bias=True)
+
+            # gnn = GATv2Conv(*inputs, *outputs, heads)
+            # gnn = SGConv(inputs, outputs, heads)
+            # gnn = EGATConv(in_node_feats=3,
+            #                 in_edge_feats=1,
+            #                 out_node_feats=1,
+            #                 out_edge_feats=1,
+            #                 num_heads=heads)
+            # gcn = GCN(in_feats=3, n_hidden=1, n_classes=1, n_layers=1)
             output_shape = np.array(outputs)*heads
-            return egat, output_shape
-        edge_features = 15
-        node_features = 15
-        heads = 60
+            return gnn, output_shape
+        edge_features = 50
+        node_features = 3
+        heads = 8
         self.layers = []
-        egat, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
-        self.layers.append(egat)
-        layers = 7
+        gnn, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
+        self.layers.append(gnn)
+        layers = 5
         output_shape = self.output_shape1
         for i in range(layers):
             egat, output_shape = gnn_block(inputs=output_shape, outputs=(node_features,edge_features), heads=heads)
@@ -220,7 +233,7 @@ class RemovalTimePredictor(nn.Module):
 
     def _forward_layer(self, graph, node_f, edge_f, gnn):
         new_node_feats, new_edge_feats = gnn(graph, node_f, edge_f)  # output shape: N x Heads x out_feats
-        new_node_feats, new_edge_feats = self.relu1(new_node_feats), self.relu1(new_edge_feats)
+        new_node_feats,new_edge_feats = self.relu1(new_node_feats), self.relu1(new_edge_feats)
         # we flatten the multi heads into 1 dimension such that we can apply the GAT again:
         nodes, edges = self.output_shape1
         new_node_feats = new_node_feats.reshape(-1, nodes)
@@ -231,5 +244,7 @@ class RemovalTimePredictor(nn.Module):
         new_node_feats, new_edge_feats = node_f, edge_f
         for egat in self.layers[:-1]:
             new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, egat)
+        # new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, self.layers[0])
+        # new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, self.layers[1])
         new_node_feats, new_edge_feats = self.layers[-1](graph, new_node_feats, new_edge_feats)
         return new_node_feats, new_edge_feats

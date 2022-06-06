@@ -9,23 +9,16 @@ import torch
 from numpy import mean
 from torch import nn, optim
 from torch.optim.lr_scheduler import ExponentialLR
-from torch_geometric.data import DataLoader
-from torch_geometric.data import Data
-from torch_geometric.loader import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
 from imitation_learning.neural_network import RemovalTimePredictor
 
-INF = 9999
-
-
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
-    # parser.add_argument('--num_train_steps', default=1000000, type=int)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--learning_rate', default=3e-3, type=float)
+    parser.add_argument('--learning_rate', default=4e-3, type=float)
     parser.add_argument('--decay', default=0.995, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
@@ -70,18 +63,23 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
 
         # TODO find out why all values of period tensor are equivalent
         output_index = 0
-        only_period = True
+        only_period = False
+        divide = 1
         if not only_period:
             padded_output = torch.zeros((graph_inputs.batch_size, len(labels[0])))
 
             for i in range(graph_inputs.batch_size):
                 nodes = graph_inputs._batch_num_nodes['_N'][i].item()
-                padded_output[i, :nodes - 2] = output[output_index+1:output_index + nodes - 1, 0, 0]
-                output_index += nodes
-            total_labels = output_index
-            padded_label_count = padded_output.shape[0]*padded_output.shape[1] - total_labels
-            loss = criterion(padded_output, labels)  # calculate on the last tensor as that is the final tank
-            correct += (torch.isclose(padded_output, labels, atol=5).sum().item() - padded_label_count)/total_labels
+                edges_count = nodes**2
+                # padded_output[i, :nodes - 1] = output[output_index+1:output_index + nodes, 0, 0] # nodes
+                padded_output[i, :nodes - 1] = edges[output_index+1:output_index + nodes, 0, 0] # edges
+                # padded_output[i, :nodes - 1] = edges[output_index::nodes, 0, 0][:nodes-1] # edges other idea
+
+                # padded_output[i, :nodes -2] = output[output_index+1:output_index + nodes - 1, 0]
+                # output_index += nodes
+                output_index += edges_count
+                correct += torch.isclose(padded_output[i, :nodes - 1], labels[i, :nodes-1], atol=5).sum().item()/nodes
+            loss = criterion(padded_output/divide, labels/divide)  # calculate on the last tensor as that is the final tank
             total += graph_inputs.batch_size
 
         else:
@@ -99,15 +97,18 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
             optimizer.step()
 
         # Keep track of loss and accuracy
-        avg_loss += loss
+        avg_loss += loss * divide
     if epoch % 2 == 1:
-        print('Pred', output[:graph_inputs._batch_num_nodes['_N'][0]][:,0,0])
-        print('Pred edges rounded', edges[:10,0,0].round())
+        print('Pred', output[:graph_inputs._batch_num_nodes['_N'][0]][:, 0, 0])
+        print('Pred edges rounded', edges[:10, 0, 0].round())
+        # print('Pred', output[:graph_inputs._batch_num_nodes['_N'][0]][:,0])
+
+        # print('Pred edges rounded', edges[:10,0,0].round())
 
     return avg_loss.item() / len(data_loader), 100 * correct / total
 
 
-def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False):
+def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False, divide_nodes=1e4):
     solutions_and_input = np.load(path, allow_pickle=True)
     solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])
     input_data = solutions_and_input[:, 0]
@@ -119,7 +120,7 @@ def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy
             num_nodes]  # obtain adjacency matrix, add 2 extra as we need start and end node
     # structure format: (tensor([0, 0, 0, 1, 1, 1, 2, 2, 2]), tensor([0, 1, 2, 0, 1, 2, 0, 1, 2]))
     # so structure[0][0] and structure[1][0] are connected etc.
-    max = 99999
+    max = 0
     # top_layers = [torch.nonzero(torch.ones(num_tanks), as_tuple=True)+num_tanks for num_tanks in
     #         num_nodes]
     structure = list(zip([torch.nonzero(adj, as_tuple=True) for adj in
@@ -156,7 +157,7 @@ def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy
         float_edges = torch.Tensor(edge_feat).reshape(-1, 1)
         edge_feats.append(float_edges)
     for i in range(len(input_data)):
-        graphs[i].ndata['x'] = corr_node_feats[i]
+        graphs[i].ndata['x'] = corr_node_feats[i]/divide_nodes
         graphs[i].edata['w'] = edge_feats[i]
     input_data = graphs
     label = 'r'
@@ -209,7 +210,7 @@ def main(_args=None):
     with open(os.path.join(args.work_dir, 'args.json'), 'w') as f:
         json.dump(vars(args), f, sort_keys=True, indent=4)
 
-    device = torch.device('cuda' if torch.cuda.is_available() and not debug else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and not debug or True else 'cpu')
     # device = torch.device('cpu')  # Use cpu to debug faster
     print("Using device:", device)
     train_set, test_set = load_graph_data()
@@ -228,7 +229,7 @@ def main(_args=None):
     model = RemovalTimePredictor()
     model.to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), args.learning_rate)  # , weight_decay=args.weight_decay)
+    optimizer = optim.Adam(model.parameters(), args.learning_rate, weight_decay=0.0)  # , weight_decay=args.weight_decay)
     scheduler = ExponentialLR(optimizer, gamma=args.decay)
     train_time_avg = []
     for epoch in range(args.epochs):
