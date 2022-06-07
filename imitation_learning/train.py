@@ -22,7 +22,7 @@ INF = 9999
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
-    parser.add_argument('--num_train_steps', default=1000000, type=int)
+    # parser.add_argument('--num_train_steps', default=1000000, type=int)
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
     parser.add_argument('--learning_rate', default=3e-3, type=float)
@@ -32,7 +32,7 @@ def parse_args(_args=None):
 
     parser.add_argument('--log_interval', default=100, type=int)
     parser.add_argument('--work_dir', default='work_dir', type=str)
-    parser.add_argument('--epochs', default=1300, type=int)
+    parser.add_argument('--epochs', default=1500, type=int)
     args = parser.parse_args(_args)
     return args
 
@@ -109,7 +109,7 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
 
 def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False):
     solutions_and_input = np.load(path, allow_pickle=True)
-    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None])
+    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])
     input_data = solutions_and_input[:, 0]
     solutions = solutions_and_input[:, 1]
     num_nodes = [torch.tensor(input['Ninner']).float() for input in input_data]
@@ -188,7 +188,7 @@ def collate_fn(batches):
 
 # best so far May27_23-04-50
 def main(_args=None):
-    debug = True
+    debug = False
     print("args", _args)
     args = parse_args(_args)
     if args.seed == -1:
@@ -213,15 +213,15 @@ def main(_args=None):
     # device = torch.device('cpu')  # Use cpu to debug faster
     print("Using device:", device)
     train_set, test_set = load_graph_data()
-    train_loader = dgl.dataloading.GraphDataLoader(train_set, batch_size=args.batch_size, collate_fn=collate_fn,
+    train_loader = dgl.dataloading.GraphDataLoader(train_set[:100], batch_size=args.batch_size, collate_fn=collate_fn,
                                                    shuffle=True, drop_last=True)
-    print('len training', len(test_set))
+    print('len training', len(train_set))
 
     # test_set = test_set[len(test_set)//args.batch_size*args.batch_size]
     print('test_set', len(test_set))
     test_loader = dgl.dataloading.GraphDataLoader(test_set, batch_size=args.batch_size, collate_fn=collate_fn,
                                                    shuffle=True, drop_last=True)
-
+    run_test = False
     if not debug:
         writer = SummaryWriter()
 
@@ -234,16 +234,16 @@ def main(_args=None):
     for epoch in range(args.epochs):
         start_time = time.time()
         model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
-        train_loss, train_accuracy = _run(train_loader, model, criterion, device, optimizer)
+        train_loss, train_accuracy = _run(train_loader, model, criterion, device, optimizer, epoch=epoch)
         train_time = time.time() - start_time
         train_time_avg.append(train_time)
 
         print('train step seconds:', mean(train_time_avg).round(3))
         test_loss, test_accuracy = None, None
-        if epoch % 4 == 1:
+        if run_test and epoch % 4 == 1:
             model.eval()
             with torch.no_grad():
-                test_loss, test_accuracy = _run(test_loader, model, criterion, device, epoch=epoch)
+                test_loss, test_accuracy = _run(test_loader, model, criterion, device)
 
         print("epoch", epoch, "train_loss", round(train_loss, 1), "train_accuracy", round(train_accuracy, 2))
 

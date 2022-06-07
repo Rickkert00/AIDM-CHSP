@@ -202,19 +202,21 @@ class RemovalTimePredictor(nn.Module):
             egat = EGATConv(*inputs, *outputs, heads, bias=True)
             output_shape = np.array(outputs)*heads
             return egat, output_shape
-        edge_features = 3
-        node_features = 3
+        edge_features = 15
+        node_features = 15
         heads = 60
         self.layers = []
         egat, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
         self.layers.append(egat)
         layers = 7
-        last_output_shape = self.output_shape1
+        output_shape = self.output_shape1
         for i in range(layers):
-            egat, last_output_shape = gnn_block(inputs=last_output_shape, outputs=(node_features,edge_features), heads=heads)
-            self.hidden_layers.append(egat)
-        egat_final, _ = gnn_block(inputs=last_output_shape, outputs=(1, 1), heads=1)
+            egat, output_shape = gnn_block(inputs=output_shape, outputs=(node_features,edge_features), heads=heads)
+            self.layers.append(egat)
+        egat_final, _ = gnn_block(inputs=output_shape, outputs=(1, 1), heads=1)
         self.layers.append(egat_final)
+        # self.all_parameters = nn.ParameterList([l.parameters() for l in self.layers])
+        self.module_list = nn.ModuleList(self.layers)
 
     def _forward_layer(self, graph, node_f, edge_f, gnn):
         new_node_feats, new_edge_feats = gnn(graph, node_f, edge_f)  # output shape: N x Heads x out_feats
@@ -227,6 +229,7 @@ class RemovalTimePredictor(nn.Module):
 
     def forward(self, graph, node_f, edge_f):
         new_node_feats, new_edge_feats = node_f, edge_f
-        for egat in self.layers:
+        for egat in self.layers[:-1]:
             new_node_feats, new_edge_feats = self._forward_layer(graph, new_node_feats, new_edge_feats, egat)
+        new_node_feats, new_edge_feats = self.layers[-1](graph, new_node_feats, new_edge_feats)
         return new_node_feats, new_edge_feats
