@@ -146,7 +146,7 @@ def train(train_loader, model, optimizer, criterion, device, test_loader):
     return avg_loss.item() / len(train_loader)  # , 100 * correct / total
 
 
-def load_graph_data_without_batching(device, training_size=0.8):
+def load_graph_data_without_batching(device, training_size=0.8, scaling=0.01):
     solutions_and_input = np.load('../chsp-generators-main/instances/linear_solutions.npy', allow_pickle=True)
     input_data = solutions_and_input[:, 0]
     solutions = solutions_and_input[:, 1]
@@ -162,8 +162,8 @@ def load_graph_data_without_batching(device, training_size=0.8):
     graphs = [dgl.graph((u_v[0][0], u_v[0][1]), device=device) for u_v in structure]
 
     # offset input variable 'f' time as by 1 as f[0] is from initial stage to first tank, need to add that later
-    node_feats = [[torch.from_numpy(np.array([0, INF, input['f'][idx]])) if idx == 0
-                   else torch.from_numpy(np.array([input['tmin'][idx - 1], input['tmax'][idx - 1], input['f'][idx]]))
+    node_feats = [[torch.from_numpy(np.array([0, INF, input['f'][idx]*scaling])) if idx == 0
+                   else torch.from_numpy(np.array([input['tmin'][idx - 1]*scaling, input['tmax'][idx - 1]*scaling, input['f'][idx]*scaling]))
                    for idx in range(int(num_nodes[i].item()) + 1)]
                   for i, input in enumerate(
             input_data)]  # need to have 3 features per node, and num_nodes nodes per problem. We add a start node already in this loop
@@ -183,10 +183,10 @@ def load_graph_data_without_batching(device, training_size=0.8):
         edge_feat = []
         edge_array = input['e']
         # add start stage
-        edge_feat.extend(np.append(edge_array[-1], 0))
+        edge_feat.extend(np.append(edge_array[-1]*scaling, 0))
         for edge_num in range(int(num_nodes[idx].item())):  # also include starting stage
             # add in between stages
-            edge_feat.extend(np.append(edge_array[edge_num], 0))
+            edge_feat.extend(np.append(edge_array[edge_num]*scaling, 0))
         # add final stage
         edge_feat.extend(np.array([0 for _ in range(int(num_nodes[idx].item()) + 2)]))
 
@@ -197,8 +197,8 @@ def load_graph_data_without_batching(device, training_size=0.8):
     input_data = [(graphs[i], corr_node_feats[i], edge_feats[i]) for i in
                   range(len(input_data))]  # convert input into 1 tuple
     # TODO change this to 'r' if we want to train using removal times
-    solved = [(torch.from_numpy(np.array(d['r'][1:])).float().unsqueeze(dim=0).reshape(-1, 1),
-               torch.from_numpy(np.array(d['objective'])).float().unsqueeze(dim=0)) for d in
+    solved = [(torch.from_numpy(np.array(d['r'][1:])*scaling).float().unsqueeze(dim=0).reshape(-1, 1),
+               torch.from_numpy(np.array(d['objective']*scaling)).float().unsqueeze(dim=0)) for d in
               solutions]  # we do not include the first element of the tensor as that is always 0 in all solutions ( we move from the initial stage as we start)
 
     length = len(input_data)
@@ -332,6 +332,7 @@ def _run_old(data_loader, model: RemovalTimePredictor, criterion, device, optimi
 
     total_train_loss = 0
     absolute_values = [1, 2, 4, 8, 16, 32, 64]
+    absolute_values = [k*0.01 for k in absolute_values]
     scaling_values = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32]
     total_train_accuracy_absolute = {k: 0 for k in absolute_values}
     total_train_accuracy_scaling = {k: 0 for k in scaling_values}
@@ -342,7 +343,7 @@ def _run_old(data_loader, model: RemovalTimePredictor, criterion, device, optimi
         # Get the inputs; data is a list of [inputs, labels]
         (graph_inputs, node_inputs, edge_inputs), (removal_times_gt, period_gt) = data
         # Move data to target device
-        node_inputs, edge_inputs, removal_times = node_inputs.to(device), edge_inputs.to(device), removal_times_gt.to(
+        node_inputs, edge_inputs, removal_times_gt = node_inputs.to(device), edge_inputs.to(device), removal_times_gt.to(
             device)
 
         if optimizer: optimizer.zero_grad()
@@ -484,8 +485,8 @@ def main(_args=None):
     with open(os.path.join(args.work_dir, 'args.json'), 'w') as f:
         json.dump(vars(args), f, sort_keys=True, indent=4)
 
-    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device = torch.device('cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cpu')
     folder = '../chsp-generators-main/instances/linear_solutions/'
     train_set, test_set = load_graph_data_without_batching(device)
     # train_loader = dgl.dataloading.GraphDataLoader(train_set, batch_size=args.batch_size, collate_fn=collate_fn,
@@ -533,7 +534,7 @@ def main(_args=None):
             }
 
             acc_d = {
-                'Train_GNN': train_acc_absolute[4], # this is 8 units off
+                'Train_GNN': train_acc_absolute[0.08], # this is 8 units off
             }
 
             acc_d = {**acc_d, **{f'Train_GNN_absolute_{k}': train_acc_absolute[k] for k in train_acc_absolute}}
