@@ -148,6 +148,7 @@ def train(train_loader, model, optimizer, criterion, device, test_loader):
 
 def load_graph_data_without_batching(device, training_size=0.8, scaling=0.01):
     solutions_and_input = np.load('../chsp-generators-main/instances/linear_solutions.npy', allow_pickle=True)
+    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])
     input_data = solutions_and_input[:, 0]
     solutions = solutions_and_input[:, 1]
     num_nodes = [torch.from_numpy(np.array(input['Ninner'])).float() for input in input_data]
