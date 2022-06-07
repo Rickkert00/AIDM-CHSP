@@ -196,7 +196,7 @@ class RemovalTimePredictor(nn.Module):
 
     def __init__(self):  # TODO find out out_features optimal sizes
         super().__init__()
-        num_heads = 20
+        num_heads = 64
         self.egat1 = EGATConv(3, 1, 3, 1, num_heads, bias=True)
         self.norm1_nodes = nn.BatchNorm1d(num_heads)  # TODO find what normalization works best
         self.norm1_edges = nn.BatchNorm1d(num_heads)

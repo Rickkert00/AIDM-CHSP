@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader, random_split, IterableDataset
 from torch.utils.tensorboard import SummaryWriter
 
-from imitation_learning.neural_network_2 import RemovalTimePredictor
+from imitation_learning.neural_network import RemovalTimePredictor
 
 INF = 9999
 
@@ -36,9 +36,9 @@ def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
     parser.add_argument('--num_train_steps', default=1000000, type=int)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--learning_rate', default=3e-3, type=float)
+    parser.add_argument('--learning_rate', default=1e-3, type=float)
     parser.add_argument('--decay', default=1, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
@@ -198,14 +198,17 @@ def load_graph_data_without_batching(device, training_size=0.8):
                   range(len(input_data))]  # convert input into 1 tuple
     # TODO change this to 'r' if we want to train using removal times
     solved = [(torch.from_numpy(np.array(d['r'][1:])).float().unsqueeze(dim=0).reshape(-1, 1),
-               torch.from_numpy(np.array(d['objective'][1:])).float().unsqueeze(dim=0)) for d in
+               torch.from_numpy(np.array(d['objective'])).float().unsqueeze(dim=0)) for d in
               solutions]  # we do not include the first element of the tensor as that is always 0 in all solutions ( we move from the initial stage as we start)
 
     length = len(input_data)
     # TODO is this a good split? maybe use random split instead of this
     training_length = int(length * training_size)
-    training = [(input_data[i], solved[i]) for i in range(training_length)]
-    test = [(input_data[i], solved[i]) for i in range(training_length, length)]
+    test_length = round((1 - training_size) * length)
+    dataset = GraphDataset([(input_data[i], solved[i]) for i in range(length)])
+    training, test = random_split(dataset, [training_length, test_length])
+    # training = [(input_data[i], solved[i]) for i in range(training_length)]
+    # test = [(input_data[i], solved[i]) for i in range(training_length, length)]
     return training, test
 
 
@@ -324,6 +327,74 @@ def collate_fn(batches):
     return batched_graph, labels_padded
 
 
+def _run_old(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=None, epoch=0, tolerances=None, rel_tolerance=None):
+    model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
+
+    total_train_loss = 0
+    absolute_values = [1, 2, 4, 8, 16, 32, 64]
+    scaling_values = [0.01, 0.02, 0.04, 0.08, 0.16, 0.32]
+    total_train_accuracy_absolute = {k: 0 for k in absolute_values}
+    total_train_accuracy_scaling = {k: 0 for k in scaling_values}
+    avg_train_accuracy_absolute = {k: 0 for k in absolute_values}
+    avg_train_accuracy_scaling = {k: 0 for k in scaling_values}
+    total = 0
+    for i, data in enumerate(data_loader):
+        # Get the inputs; data is a list of [inputs, labels]
+        (graph_inputs, node_inputs, edge_inputs), (removal_times_gt, period_gt) = data
+        # Move data to target device
+        node_inputs, edge_inputs, removal_times = node_inputs.to(device), edge_inputs.to(device), removal_times_gt.to(
+            device)
+
+        if optimizer: optimizer.zero_grad()
+
+        removal_times, _ = model(graph_inputs, node_inputs, edge_inputs)
+        removal_times = removal_times.squeeze(-1)
+        if i % 1000 == 0:
+            print(removal_times)
+        if removal_times[1:-1].shape != removal_times_gt.shape:
+            print("WRONG SHAPE")
+        loss = criterion(removal_times[1:-1], removal_times_gt)
+        if optimizer:
+            loss.backward()
+            optimizer.step()
+
+        # Keep track of loss and accuracy
+        # Keep track of loss and accuracy
+        total_train_loss += loss
+        for k in total_train_accuracy_absolute:
+            total_train_accuracy_absolute[k] += (torch.isclose(removal_times[1:-1], removal_times_gt, atol=k,
+                                                               rtol=0).sum().item() / removal_times_gt.size(0))
+        for k in total_train_accuracy_scaling:
+            total_train_accuracy_scaling[k] += (
+                    torch.isclose(removal_times[1:-1], removal_times_gt, atol=(k * period_gt).item(),
+                                  rtol=0).sum().item() / removal_times_gt.size(0))
+
+    for k in total_train_accuracy_absolute:
+        avg_train_accuracy_absolute[k] = total_train_accuracy_absolute[k] / len(data_loader)
+    for k in total_train_accuracy_scaling:
+        avg_train_accuracy_scaling[k] = total_train_accuracy_scaling[k] / len(data_loader)
+    avg_train_loss = total_train_loss.item() / len(data_loader)
+    # calculate test loss
+    # model.eval()
+    # with torch.no_grad():
+    #     accuracy = 0
+    #     total_test_loss = 0
+    #     total_test_accuracy = 0
+    #     avg_loss = 0
+    #     for i, data in enumerate(test_loader):
+    #         # get inputs
+    #         (graph_inputs, node_inputs, edge_inputs), labels = data
+    #         # Move data to target device
+    #         node_inputs, edge_inputs, labels = node_inputs.to(device), edge_inputs.to(device), labels.to(device)
+    #         # Forward + backward
+    #         removal_times, _ = model(graph_inputs, node_inputs, edge_inputs)
+    #         removal_times = removal_times.squeeze(-1)
+    #         loss = criterion(removal_times[1:-1], labels)
+    #         total_test_loss += loss
+    #         total += labels.size(0)
+    # avg_test_loss = total_test_loss.item() / len(test_loader)
+    return avg_train_loss, avg_train_accuracy_absolute, avg_train_accuracy_scaling
+
 def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=None, epoch=0, tolerances=None, rel_tolerance=None):
     avg_loss = 0
     correct = 0
@@ -416,16 +487,17 @@ def main(_args=None):
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cpu')
     folder = '../chsp-generators-main/instances/linear_solutions/'
-    train_set, test_set = load_graph_data_with_batching(device,scaling=scaling)
-    train_loader = dgl.dataloading.GraphDataLoader(train_set, batch_size=args.batch_size, collate_fn=collate_fn,
-                                                   shuffle=True, drop_last=True)
-    print('len training', len(train_set))
-
-    # test_set = test_set[len(test_set)//args.batch_size*args.batch_size]
-    print('test_set', len(test_set))
-    test_loader = dgl.dataloading.GraphDataLoader(test_set, batch_size=args.batch_size, collate_fn=collate_fn,
-                                                  shuffle=True, drop_last=True)
-
+    train_set, test_set = load_graph_data_without_batching(device)
+    # train_loader = dgl.dataloading.GraphDataLoader(train_set, batch_size=args.batch_size, collate_fn=collate_fn,
+    #                                                shuffle=True, drop_last=True)
+    # print('len training', len(train_set))
+    #
+    # # test_set = test_set[len(test_set)//args.batch_size*args.batch_size]
+    # print('test_set', len(test_set))
+    # test_loader = dgl.dataloading.GraphDataLoader(test_set, batch_size=args.batch_size, collate_fn=collate_fn,
+    #                                               shuffle=True, drop_last=True)
+    train_loader = DataLoader(train_set, collate_fn=collate_fn_old, shuffle=True, drop_last=True)
+    test_loader = DataLoader(test_set, collate_fn=collate_fn_old, shuffle=True, drop_last=True)
     if not debug:
         writer = SummaryWriter()
 
@@ -442,18 +514,18 @@ def main(_args=None):
     for epoch in range(args.epochs):
         start_time = time.time()
         model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
-        train_loss, train_accuracy, train_acc_absolute, train_acc_scaling = _run(train_loader, model, criterion, device, optimizer, tolerances=absolute_values, rel_tolerance=scaling_values)
+        train_loss, train_acc_absolute, train_acc_scaling = _run_old(train_loader, model, criterion, device, optimizer)
         train_time = time.time() - start_time
         train_time_avg.append(train_time)
 
         print('train step seconds:', mean(train_time_avg).round(3))
-        test_loss, test_accuracy = None, None
-        if epoch % 4 == 1:
-            model.eval()
-            with torch.no_grad():
-                test_loss, test_accuracy, test_acc_absolute, test_acc_scaling = _run(test_loader, model, criterion, device, epoch=epoch,tolerances=absolute_values, rel_tolerance=scaling_values)
+        # test_loss, test_accuracy = None, None
+        # if epoch % 4 == 1:
+        #     model.eval()
+        #     with torch.no_grad():
+        #         test_loss, test_accuracy, test_acc_absolute, test_acc_scaling = _run_old(test_loader, model, criterion, device, epoch=epoch,tolerances=absolute_values, rel_tolerance=scaling_values)
 
-        print("epoch", epoch, "train_loss", round(train_loss, 1), "train_accuracy", round(train_accuracy, 2))
+        print("epoch", epoch, "train_loss", round(train_loss, 1), "train_accuracy", train_acc_absolute)
 
         if not debug:
             loss_d = {
@@ -461,15 +533,16 @@ def main(_args=None):
             }
 
             acc_d = {
-                'Train_GNN': train_accuracy,
+                'Train_GNN': train_acc_absolute[4], # this is 8 units off
             }
+
             acc_d = {**acc_d, **{f'Train_GNN_absolute_{k}': train_acc_absolute[k] for k in train_acc_absolute}}
             acc_d = {**acc_d, **{f'Train_GNN_scaling_{k}': train_acc_scaling[k] for k in train_acc_scaling}}
-            if test_loss:
-                loss_d['Test_GNN'] = test_loss
-                acc_d['Test_GNN'] = test_accuracy
-                acc_d = {**acc_d, **{f'Test_GNN_absolute_{k}': test_acc_absolute[k] for k in test_acc_absolute}}
-                acc_d = {**acc_d, **{f'Test_GNN_scaling_{k}': test_acc_scaling[k] for k in test_acc_scaling}}
+            # if test_loss:
+            #     loss_d['Test_GNN'] = test_loss
+            #     acc_d['Test_GNN'] = test_accuracy
+            #     acc_d = {**acc_d, **{f'Test_GNN_absolute_{k}': test_acc_absolute[k] for k in test_acc_absolute}}
+            #     acc_d = {**acc_d, **{f'Test_GNN_scaling_{k}': test_acc_scaling[k] for k in test_acc_scaling}}
             writer.add_scalars('Loss', loss_d, epoch)
             writer.add_scalars('Accuracy', acc_d, epoch)
         scheduler.step()
