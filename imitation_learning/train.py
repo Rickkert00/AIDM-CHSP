@@ -38,7 +38,7 @@ def parse_args(_args=None):
     parser.add_argument('--num_train_steps', default=1000000, type=int)
     parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--learning_rate', default=0.1, type=float)
+    parser.add_argument('--learning_rate', default=0.01, type=float)
     parser.add_argument('--decay', default=1, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
