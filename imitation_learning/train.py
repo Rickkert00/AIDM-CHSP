@@ -8,7 +8,7 @@ import dgl
 import numpy as np
 import torch
 from torch import nn, optim
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, LinearLR
 from torch.utils.data import DataLoader, random_split, IterableDataset
 from torch.utils.tensorboard import SummaryWriter
 
@@ -38,14 +38,14 @@ def parse_args(_args=None):
     parser.add_argument('--num_train_steps', default=1000000, type=int)
     parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--learning_rate', default=1e-3, type=float)
+    parser.add_argument('--learning_rate', default=0.1, type=float)
     parser.add_argument('--decay', default=1, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
 
     parser.add_argument('--log_interval', default=100, type=int)
     parser.add_argument('--work_dir', default='work_dir', type=str)
-    parser.add_argument('--epochs', default=5000, type=int)
+    parser.add_argument('--epochs', default=2500, type=int)
     args = parser.parse_args(_args)
     return args
 
@@ -328,7 +328,7 @@ def collate_fn(batches):
     return batched_graph, labels_padded
 
 
-def _run_old(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=None, epoch=0, tolerances=None, rel_tolerance=None):
+def _run_old(data_loader,test_loader, model: RemovalTimePredictor, criterion, device, optimizer=None, epoch=0, tolerances=None, rel_tolerance=None):
     model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
 
     total_train_loss = 0
@@ -377,25 +377,24 @@ def _run_old(data_loader, model: RemovalTimePredictor, criterion, device, optimi
         avg_train_accuracy_scaling[k] = total_train_accuracy_scaling[k] / len(data_loader)
     avg_train_loss = total_train_loss.item() / len(data_loader)
     # calculate test loss
-    # model.eval()
-    # with torch.no_grad():
-    #     accuracy = 0
-    #     total_test_loss = 0
-    #     total_test_accuracy = 0
-    #     avg_loss = 0
-    #     for i, data in enumerate(test_loader):
-    #         # get inputs
-    #         (graph_inputs, node_inputs, edge_inputs), labels = data
-    #         # Move data to target device
-    #         node_inputs, edge_inputs, labels = node_inputs.to(device), edge_inputs.to(device), labels.to(device)
-    #         # Forward + backward
-    #         removal_times, _ = model(graph_inputs, node_inputs, edge_inputs)
-    #         removal_times = removal_times.squeeze(-1)
-    #         loss = criterion(removal_times[1:-1], labels)
-    #         total_test_loss += loss
-    #         total += labels.size(0)
-    # avg_test_loss = total_test_loss.item() / len(test_loader)
-    return avg_train_loss, avg_train_accuracy_absolute, avg_train_accuracy_scaling
+    model.eval()
+    with torch.no_grad():
+        accuracy = 0
+        total_test_loss = 0
+        total_test_accuracy = 0
+        avg_loss = 0
+        for i, data in enumerate(test_loader):
+            # get inputs
+            (graph_inputs, node_inputs, edge_inputs), (removal_times_gt, period_gt) = data
+            # Move data to target device
+            node_inputs, edge_inputs, removal_times_gt = node_inputs.to(device), edge_inputs.to(device), removal_times_gt.to(device)
+            # Forward + backward
+            removal_times, _ = model(graph_inputs, node_inputs, edge_inputs)
+            removal_times = removal_times.squeeze(-1)
+            loss = criterion(removal_times[1:-1], removal_times_gt)
+            total_test_loss += loss
+    avg_test_loss = total_test_loss.item() / len(test_loader)
+    return avg_train_loss, avg_train_accuracy_absolute, avg_train_accuracy_scaling, avg_test_loss
 
 def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=None, epoch=0, tolerances=None, rel_tolerance=None):
     avg_loss = 0
@@ -512,11 +511,12 @@ def main(_args=None):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), args.learning_rate)  # , weight_decay=args.weight_decay)
     scheduler = ExponentialLR(optimizer, gamma=args.decay) # todo do not change learning rate to prevent stagnation
+    scheduler = LinearLR(optimizer, start_factor=1.0, end_factor=0.01, total_iters=args.epochs)
     train_time_avg = []
     for epoch in range(args.epochs):
         start_time = time.time()
         model.train()  # model.train needs to be activated since the test method sets it to model.test. This is needed for batch normalization
-        train_loss, train_acc_absolute, train_acc_scaling = _run_old(train_loader, model, criterion, device, optimizer)
+        train_loss, train_acc_absolute, train_acc_scaling, test_loss = _run_old(train_loader, test_loader, model, criterion, device, optimizer)
         train_time = time.time() - start_time
         train_time_avg.append(train_time)
 
@@ -527,11 +527,12 @@ def main(_args=None):
         #     with torch.no_grad():
         #         test_loss, test_accuracy, test_acc_absolute, test_acc_scaling = _run_old(test_loader, model, criterion, device, epoch=epoch,tolerances=absolute_values, rel_tolerance=scaling_values)
 
-        print("epoch", epoch, "train_loss", round(train_loss, 1), "train_accuracy", train_acc_absolute)
+        print("epoch", epoch, "train_loss", round(train_loss, 1), "train_accuracy", train_acc_absolute, "test loss", test_loss)
 
         if not debug:
             loss_d = {
                 'Train_GNN': train_loss,
+                'Test_GNN': test_loss
             }
 
             acc_d = {
@@ -549,6 +550,9 @@ def main(_args=None):
             writer.add_scalars('Accuracy', acc_d, epoch)
         scheduler.step()
         print("lr:", round(scheduler.get_last_lr()[0], 8))
+
+    # we save the model
+    torch.save(model, os.path.join(args.work_dir, 'GNN_Model.pt'))
     if not debug:
         writer.flush()
         writer.close()

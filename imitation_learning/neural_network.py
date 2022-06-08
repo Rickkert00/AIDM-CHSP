@@ -197,18 +197,20 @@ class RemovalTimePredictor(nn.Module):
     def __init__(self):  # TODO find out out_features optimal sizes
         super().__init__()
         num_heads = 64
-        self.egat1 = EGATConv(3, 1, 3, 1, num_heads, bias=True)
-        self.norm1_nodes = nn.BatchNorm1d(num_heads)  # TODO find what normalization works best
-        self.norm1_edges = nn.BatchNorm1d(num_heads)
+        num_node_feats = 32
+        num_edge_feats = 16
+        self.egat1 = EGATConv(3, 1, num_node_feats, num_edge_feats, num_heads, bias=True)
+        self.norm1_nodes = nn.LayerNorm([num_heads, num_node_feats])  # TODO find what normalization works best
+        self.norm1_edges = nn.LayerNorm([num_heads, num_edge_feats])
         self.relu1 = nn.ReLU()
 
-        self.egat2_input_size_edges = 1 * num_heads  # times 3 because we use 3 attention heads
-        self.egat2_input_size_nodes = 3 * num_heads
-        self.egat2 = EGATConv(self.egat2_input_size_nodes, self.egat2_input_size_edges, 3, 1, num_heads, bias=True)
-        self.norm2_nodes = nn.BatchNorm1d(num_heads)
-        self.norm2_edges = nn.BatchNorm1d(num_heads)
-        self.egat3_input_size_edges = 1 * num_heads  # again times 3 as we use 3 heads in 2nd gat layer
-        self.egat3_input_size_nodes = 3 * num_heads
+        self.egat2_input_size_edges = num_edge_feats * num_heads  # times 3 because we use 3 attention heads
+        self.egat2_input_size_nodes = num_node_feats * num_heads
+        self.egat2 = EGATConv(self.egat2_input_size_nodes, self.egat2_input_size_edges, num_node_feats, num_edge_feats, num_heads, bias=True)
+        self.norm2_nodes = nn.LayerNorm([num_heads, num_node_feats])  # TODO find what normalization works best
+        self.norm2_edges = nn.LayerNorm([num_heads, num_edge_feats])
+        self.egat3_input_size_edges = num_edge_feats * num_heads  # again times 3 as we use 3 heads in 2nd gat layer
+        self.egat3_input_size_nodes = num_node_feats * num_heads
         self.egat3 = EGATConv(self.egat3_input_size_nodes, self.egat3_input_size_edges, 1, 1, 1, bias=True)
 
     def forward(self, graph, node_f, edge_f):
