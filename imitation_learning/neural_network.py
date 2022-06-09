@@ -216,8 +216,8 @@ class RemovalTimePredictor(nn.Module):
             output_shape = np.array(outputs)*heads
             return gnn, output_shape
         edge_features = 50
-        node_features = 3
-        heads = 8
+        node_features = 3*4
+        heads = 24
         self.layers = []
         gnn, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
         self.layers.append(gnn)

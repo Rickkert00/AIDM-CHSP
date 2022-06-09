@@ -72,7 +72,12 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
                 nodes = graph_inputs._batch_num_nodes['_N'][i].item()
                 edges_count = nodes**2
                 # padded_output[i, :nodes - 1] = output[output_index+1:output_index + nodes, 0, 0] # nodes
-                padded_output[i, :nodes - 1] = edges[output_index+1:output_index + nodes, 0, 0] # edges
+                prediction = edges[output_index+1:output_index + nodes, 0, 0]
+                if i == 0:
+                    print("PRED ", prediction)
+                    print("Answer ", labels[i, :nodes-1])
+                padded_output[i, :nodes - 1] = prediction # edges
+
                 # padded_output[i, :nodes - 1] = edges[output_index::nodes, 0, 0][:nodes-1] # edges other idea
 
                 # padded_output[i, :nodes -2] = output[output_index+1:output_index + nodes - 1, 0]
@@ -98,9 +103,9 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
 
         # Keep track of loss and accuracy
         avg_loss += loss * divide
-    if epoch % 2 == 1:
-        print('Pred', output[:graph_inputs._batch_num_nodes['_N'][0]][:, 0, 0])
-        print('Pred edges rounded', edges[:10, 0, 0].round())
+    # if epoch % 2 == 1:
+    # print('Pred', output[:graph_inputs._batch_num_nodes['_N'][0]][:, 0, 0])
+    # print('Pred edges rounded', edges[:10, 0, 0].round())
         # print('Pred', output[:graph_inputs._batch_num_nodes['_N'][0]][:,0])
 
         # print('Pred edges rounded', edges[:10,0,0].round())
