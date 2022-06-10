@@ -16,10 +16,10 @@ from imitation_learning.neural_network import RemovalTimePredictor
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=128, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--learning_rate', default=4e-3, type=float)
-    parser.add_argument('--decay', default=0.995, type=float)
+    parser.add_argument('--learning_rate', default=1e-3, type=float)
+    parser.add_argument('--decay', default=0.999, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
 
@@ -113,9 +113,9 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
     return avg_loss.item() / len(data_loader), 100 * correct / total
 
 
-def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False, divide_nodes=1e4):
+def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False, divide_nodes=1e4, total_samples=1500):
     solutions_and_input = np.load(path, allow_pickle=True)
-    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])
+    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])[:total_samples]
     input_data = solutions_and_input[:, 0]
     solutions = solutions_and_input[:, 1]
     num_nodes = [torch.tensor(input['Ninner']).float() for input in input_data]
@@ -172,8 +172,8 @@ def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy
     length = len(input_data)
     # TODO is this a good split? maybe use random split instead of this
     training_length = int(length * training_size)
-    training = [(input_data[i], solved[i]) for i in range(training_length)]
-    test = [(input_data[i], solved[i]) for i in range(training_length, length)]
+    dataset = [[input_data[i], solved[i]] for i in range(length)]
+    training, test = torch.utils.data.random_split(dataset, [training_length, length-training_length])
     return training, test
 
 def save(model, model_dir, epoch):
@@ -202,7 +202,7 @@ def main(_args=None):
     args = parse_args(_args)
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
-    exp_id = 'test'
+    exp_id = 'random_split'
     set_seed_everywhere(args.seed)
     # make directory
     ts = time.gmtime()
@@ -222,13 +222,20 @@ def main(_args=None):
     # device = torch.device('cpu')  # Use cpu to debug faster
     print("Using device:", device)
     train_set, test_set = load_graph_data()
-    train_loader = dgl.dataloading.GraphDataLoader(train_set[:len(train_set)//3], batch_size=args.batch_size, collate_fn=collate_fn,
+    for i, t in enumerate(train_set):
+        train_set[i][0] = t[0].to(device)
+        train_set[i][1] = t[1].to(device)
+    for i, t in enumerate(test_set):
+        test_set[i][0] = t[0].to(device)
+        test_set[i][1] = t[1].to(device)
+    print(train_set[0][0].device)
+    train_loader = dgl.dataloading.GraphDataLoader(train_set, batch_size=args.batch_size, collate_fn=collate_fn,
                                                    shuffle=True, drop_last=True)
     print('len training', len(train_set))
 
     # test_set = test_set[len(test_set)//args.batch_size*args.batch_size]
     print('test_set', len(test_set))
-    test_loader = dgl.dataloading.GraphDataLoader(test_set[:len(test_set)//3], batch_size=args.batch_size, collate_fn=collate_fn,
+    test_loader = dgl.dataloading.GraphDataLoader(test_set, batch_size=args.batch_size, collate_fn=collate_fn,
                                                    shuffle=True, drop_last=True)
     run_test = True
     if not debug:
@@ -237,7 +244,7 @@ def main(_args=None):
     model = RemovalTimePredictor()
     model.to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), args.learning_rate, weight_decay=0.0)  # , weight_decay=args.weight_decay)
+    optimizer = optim.AdamW(model.parameters(), args.learning_rate)
     scheduler = ExponentialLR(optimizer, gamma=args.decay)
     train_time_avg = []
     for epoch in range(args.epochs):
@@ -269,16 +276,12 @@ def main(_args=None):
             writer.add_scalars('Loss', loss_d, epoch)
             writer.add_scalars('Accurary', acc_d, epoch)
             if epoch >= 10 and epoch % 5 == 0:
-                save(model, model_dir=args.work_dir)
+                save(model, model_dir=args.work_dir, epoch=epoch)
         scheduler.step()
         print("lr:", round(scheduler.get_last_lr()[0], 8))
     if not debug:
         writer.flush()
         writer.close()
-    # if args.model_dir is not None:
-    #   pass
-    # agent.load(args.model_dir, args.model_step)
-    # L = Logger(args.work_dir, use_tb=args.save_tb)
 
 
 if __name__ == '__main__':

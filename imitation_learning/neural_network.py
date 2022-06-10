@@ -8,9 +8,6 @@ from dgl.nn.pytorch import SGConv
 from torch import nn
 from torch.nn import init
 
-from imitation_learning.gcn import GCN
-
-
 class EGATConv(nn.Module):
     r"""
 
@@ -201,7 +198,6 @@ class RemovalTimePredictor(nn.Module):
     def __init__(self):  # TODO find out out_features optimal sizes
         super().__init__()
         self.relu1 = nn.ReLU()
-        from dgl.nn import GATv2Conv
         def gnn_block(inputs, outputs, heads):
             gnn = EGATConv(*inputs, *outputs, heads, bias=True)
 
@@ -224,6 +220,8 @@ class RemovalTimePredictor(nn.Module):
         layers = 8
         # trying 1000 training steps now.
         # Also increased to 8 layers. Hopefully have enough parameters
+
+        # Decreased learning rate worked better!!!
         output_shape = self.output_shape1
         for i in range(layers):
             egat, output_shape = gnn_block(inputs=output_shape, outputs=(node_features,edge_features), heads=heads)

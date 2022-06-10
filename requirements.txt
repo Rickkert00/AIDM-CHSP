@@ -11,6 +11,6 @@ torch-sparse
 jupyter
 iminizinc
 gurobipy
-# install pip install dgl-cu113 dglgo -f https://data.dgl.ai/wheels/repo.html
+# pip install dgl-cu113 dglgo -f https://data.dgl.ai/wheels/repo.html
 dgl
 tensorboard
