@@ -16,7 +16,7 @@ from imitation_learning.neural_network import RemovalTimePredictor
 def parse_args(_args=None):
     parser = argparse.ArgumentParser()
     # environment
-    parser.add_argument('--batch_size', default=8, type=int)
+    parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
     parser.add_argument('--learning_rate', default=4e-3, type=float)
     parser.add_argument('--decay', default=0.995, type=float)
@@ -51,7 +51,7 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
     total = 0
     # Iterate through batches
     output = None
-    for _, data in enumerate(data_loader):
+    for j, data in enumerate(data_loader):
         # Get the inputs; data is a list of [inputs, labels]
         graph_inputs, labels = data
         # Move data to target device
@@ -73,7 +73,7 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
                 edges_count = nodes**2
                 # padded_output[i, :nodes - 1] = output[output_index+1:output_index + nodes, 0, 0] # nodes
                 prediction = edges[output_index+1:output_index + nodes, 0, 0]
-                if i == 0:
+                if i == 0 and j == 0:
                     print("PRED ", prediction)
                     print("Answer ", labels[i, :nodes-1])
                 padded_output[i, :nodes - 1] = prediction # edges
@@ -176,7 +176,10 @@ def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy
     test = [(input_data[i], solved[i]) for i in range(training_length, length)]
     return training, test
 
-
+def save(model, model_dir, epoch):
+    torch.save(
+        model.state_dict(), '%s/model_%s.pt' % (model_dir, epoch)
+    )
 def collate_fn(batches):
     """
     Custom function for creating batches of training samples, right now this will construct batches of
@@ -219,15 +222,15 @@ def main(_args=None):
     # device = torch.device('cpu')  # Use cpu to debug faster
     print("Using device:", device)
     train_set, test_set = load_graph_data()
-    train_loader = dgl.dataloading.GraphDataLoader(train_set[:100], batch_size=args.batch_size, collate_fn=collate_fn,
+    train_loader = dgl.dataloading.GraphDataLoader(train_set[:len(train_set)//3], batch_size=args.batch_size, collate_fn=collate_fn,
                                                    shuffle=True, drop_last=True)
     print('len training', len(train_set))
 
     # test_set = test_set[len(test_set)//args.batch_size*args.batch_size]
     print('test_set', len(test_set))
-    test_loader = dgl.dataloading.GraphDataLoader(test_set, batch_size=args.batch_size, collate_fn=collate_fn,
+    test_loader = dgl.dataloading.GraphDataLoader(test_set[:len(test_set)//3], batch_size=args.batch_size, collate_fn=collate_fn,
                                                    shuffle=True, drop_last=True)
-    run_test = False
+    run_test = True
     if not debug:
         writer = SummaryWriter()
 
@@ -265,6 +268,8 @@ def main(_args=None):
                 acc_d['Test_GNN'] = test_accuracy
             writer.add_scalars('Loss', loss_d, epoch)
             writer.add_scalars('Accurary', acc_d, epoch)
+            if epoch >= 10 and epoch % 5 == 0:
+                save(model, model_dir=args.work_dir)
         scheduler.step()
         print("lr:", round(scheduler.get_last_lr()[0], 8))
     if not debug:

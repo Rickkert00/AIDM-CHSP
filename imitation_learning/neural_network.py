@@ -221,7 +221,9 @@ class RemovalTimePredictor(nn.Module):
         self.layers = []
         gnn, self.output_shape1 = gnn_block(inputs=(3,1), outputs=(node_features,edge_features), heads=heads)
         self.layers.append(gnn)
-        layers = 5
+        layers = 8
+        # trying 1000 training steps now.
+        # Also increased to 8 layers. Hopefully have enough parameters
         output_shape = self.output_shape1
         for i in range(layers):
             egat, output_shape = gnn_block(inputs=output_shape, outputs=(node_features,edge_features), heads=heads)
@@ -238,6 +240,8 @@ class RemovalTimePredictor(nn.Module):
         nodes, edges = self.output_shape1
         new_node_feats = new_node_feats.reshape(-1, nodes)
         new_edge_feats = new_edge_feats.reshape(-1, edges)
+        if new_node_feats.shape == node_f.shape:
+            return new_node_feats+node_f, new_edge_feats+edge_f
         return new_node_feats, new_edge_feats
 
     def forward(self, graph, node_f, edge_f):
