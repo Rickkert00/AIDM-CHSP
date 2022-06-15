@@ -38,16 +38,20 @@ def run(i):
         return None,None
 def main():
     global linear_problems, solver_string, solver
-    solver_string = 'gecode'
-    param_file = "instances/linearproblems.npy"
-    solution_file = 'instances/linear_solutions.npy'
+    solver_string = 'gecode'; num=4
+    param_file = f"instances/linearproblems_{num}.npy"
+    solution_file = f'instances/linear_solutions_{num}.npy'
     solver = Solver.lookup(solver_string)
     solutions = []
     if os.path.exists(solution_file):
         solutions = np.load(solution_file, allow_pickle=True).tolist()
     linear_problems = list(np.load(param_file, allow_pickle=True).item().values())
-
+    solution_file = f'instances/linear_solutions_{3}.npy'
+    print(solutions[-1:],np.load(solution_file, allow_pickle=True).tolist()[-1:])
+    print(solutions[0],np.load(solution_file, allow_pickle=True).tolist()[0])
+    assert solutions[-1:] == np.load(solution_file, allow_pickle=True).tolist()[-1:]
     parallel = 10
+    print(f"Running seed {num} Start at", len(linear_problems))
     for i in range(len(solutions), len(linear_problems), parallel):
         with Pool(parallel) as p:
             ret = p.map(run, range(i, i + parallel))
