@@ -173,17 +173,16 @@ def load_graph_data(files, training_size=0.9, predict_period=False, divide_nodes
     for i in range(len(input_data)):
         graphs[i].ndata['x'] = corr_node_feats[i]/divide_nodes
         graphs[i].edata['w'] = edge_feats[i]
-    input_data = graphs
     label = 'r'
     if predict_period:
         label = 'objective'
     solved = [torch.tensor(d[label][1:]+[d['objective']]).float().unsqueeze(dim=0) for d in solutions]
-    length = len(input_data)
+    length = len(graphs)
     # TODO is this a good split? maybe use random split instead of this
     training_length = int(length * training_size)
-    dataset = [[input_data[i], solved[i]] for i in range(length)]
+    dataset = [[graphs[i], solved[i]] for i in range(length)]
     training, test = torch.utils.data.random_split(dataset, [training_length, length-training_length])
-    return training, test
+    return training, test, input_data[training.indices]
 
 def save(model, model_dir, epoch):
     torch.save(
@@ -206,7 +205,7 @@ def collate_fn(batches):
 
 # best so far May27_23-04-50
 def main(_args=None):
-    debug = False
+    debug = True
     print("args", _args)
     args = parse_args(_args)
     if args.seed == -1:
@@ -232,7 +231,7 @@ def main(_args=None):
     print("Using device:", device)
     base_path = 'chsp-generators-main/instances/'
     files = [base_path+f"linear_solutions_{i}.npy" for i in range(1,9)]
-    train_set, test_set = load_graph_data(files)
+    train_set, test_set, _ = load_graph_data(files)
     for i, t in enumerate(train_set):
         train_set[i][0] = t[0].to(device)
         train_set[i][1] = t[1].to(device)
