@@ -139,9 +139,10 @@ def generateRandomProblems(save_np=False, seed=0, max=999999):
     timeRange = ["fixed", "small", "large"]
     inst = 0
     instances = {}
-    base_path = "instances/linear"
-    for rounds, tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability in itertools.product(
-            range(1, 4), range(3, 25), processingTimeScale, similarity, variability, timeRange, variability):
+    base_path = "../instances/linear"
+    filename = base_path + f"problems_{seed}.npy"
+    for tanks, rounds, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability,  in itertools.product(
+            range(3, 25), range(1, 4), processingTimeScale, similarity, variability, timeRange, variability):
         inst += 1
         vars = tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability
         problem = generate_problem(*vars, save_np)
