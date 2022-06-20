@@ -18,14 +18,14 @@ def parse_args(_args=None):
     # environment
     parser.add_argument('--batch_size', default=128, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
-    parser.add_argument('--learning_rate', default=1e-3, type=float)
+    parser.add_argument('--learning_rate', default=2e-3, type=float)
     parser.add_argument('--decay', default=0.999, type=float)
     # misc
     parser.add_argument('--seed', default=1, type=int)
 
     parser.add_argument('--log_interval', default=100, type=int)
     parser.add_argument('--work_dir', default='work_dir', type=str)
-    parser.add_argument('--epochs', default=1500, type=int)
+    parser.add_argument('--epochs', default=2000, type=int)
     args = parser.parse_args(_args)
     return args
 
@@ -74,8 +74,9 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
                 # padded_output[i, :nodes - 1] = output[output_index+1:output_index + nodes, 0, 0] # nodes
                 prediction = edges[output_index+1:output_index + nodes, 0, 0]
                 if i == 0 and j == 0:
-                    print("PRED ", prediction)
-                    print("Answer ", labels[i, :nodes-1])
+                    test_str = 'TEST' if optimizer is None else 'TRAIN'
+                    print(f"{test_str} PRED ", prediction)
+                    print(f"{test_str} Answer ", labels[i, :nodes-1])
                 padded_output[i, :nodes - 1] = prediction # edges
 
                 # padded_output[i, :nodes - 1] = edges[output_index::nodes, 0, 0][:nodes-1] # edges other idea
@@ -113,11 +114,19 @@ def _run(data_loader, model: RemovalTimePredictor, criterion, device, optimizer=
     return avg_loss.item() / len(data_loader), 100 * correct / total
 
 
-def load_graph_data(path='../chsp-generators-main/instances/linear_solutions.npy', training_size=0.8, predict_period=False, divide_nodes=1e4, total_samples=1500):
-    solutions_and_input = np.load(path, allow_pickle=True)
-    solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])[:total_samples]
-    input_data = solutions_and_input[:, 0]
-    solutions = solutions_and_input[:, 1]
+def load_graph_data(files, training_size=0.9, predict_period=False, divide_nodes=1e4, total_samples=10000):
+    all_solutions_and_input = None
+    for f in files:
+        print("loading", f)
+        solutions_and_input = np.load(f, allow_pickle=True)
+        solutions_and_input = np.vstack([s for s in solutions_and_input if s is not None and s[1] is not None])[:total_samples]
+        if all_solutions_and_input is None:
+            all_solutions_and_input = solutions_and_input
+        else:
+            all_solutions_and_input = np.vstack([all_solutions_and_input, solutions_and_input]) 
+        print("Shape input", all_solutions_and_input.shape)
+    input_data = all_solutions_and_input[:, 0]
+    solutions = all_solutions_and_input[:, 1]
     num_nodes = [torch.tensor(input['Ninner']).float() for input in input_data]
 
     # fully connected adj matrix with weights, including self connections
@@ -202,7 +211,7 @@ def main(_args=None):
     args = parse_args(_args)
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
-    exp_id = 'random_split'
+    exp_id = 'random_split_big3'
     set_seed_everywhere(args.seed)
     # make directory
     ts = time.gmtime()
@@ -221,7 +230,9 @@ def main(_args=None):
     device = torch.device('cuda' if torch.cuda.is_available() and not debug or True else 'cpu')
     # device = torch.device('cpu')  # Use cpu to debug faster
     print("Using device:", device)
-    train_set, test_set = load_graph_data()
+    base_path = 'chsp-generators-main/instances/'
+    files = [base_path+f"linear_solutions_{i}.npy" for i in range(1,9)]
+    train_set, test_set = load_graph_data(files)
     for i, t in enumerate(train_set):
         train_set[i][0] = t[0].to(device)
         train_set[i][1] = t[1].to(device)
@@ -275,7 +286,7 @@ def main(_args=None):
                 acc_d['Test_GNN'] = test_accuracy
             writer.add_scalars('Loss', loss_d, epoch)
             writer.add_scalars('Accurary', acc_d, epoch)
-            if epoch >= 10 and epoch % 5 == 0:
+            if epoch >= 2 and epoch % 5 == 0:
                 save(model, model_dir=args.work_dir, epoch=epoch)
         scheduler.step()
         print("lr:", round(scheduler.get_last_lr()[0], 8))

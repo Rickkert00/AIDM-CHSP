@@ -130,7 +130,7 @@ def generate_problem(tanks, processingTimeBase, lowerVsUpperMean, timeMinVariabi
     return {'Ninner': tanks, 'tmin': lowers, 'tmax': uppers, 'f': fulls, 'e': e, 'emptys': emptys}
 
 
-def generateRandomProblems(save_np=False, seed=0):
+def generateRandomProblems(save_np=False, seed=0, max=999999):
     random.seed(seed)
     debug=False
     processingTimeScale = [30, 60, 100, 150, 250, 450, 600]
@@ -139,7 +139,7 @@ def generateRandomProblems(save_np=False, seed=0):
     timeRange = ["fixed", "small", "large"]
     inst = 0
     instances = {}
-    base_path = "../instances/linear"
+    base_path = "instances/linear"
     for rounds, tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability in itertools.product(
             range(1, 4), range(3, 25), processingTimeScale, similarity, variability, timeRange, variability):
         inst += 1
@@ -153,6 +153,8 @@ def generateRandomProblems(save_np=False, seed=0):
         elif not debug:
             filename = f"{base_path}/{inst}.dzn"
             save_problem_to_file(filename, *list(problem.values()))
+        if inst >= max:
+            break
     if save_np and not debug:
         print("save np")
         np.save(base_path + "problems.npy", instances)

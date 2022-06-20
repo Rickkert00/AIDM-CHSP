@@ -4,6 +4,7 @@ from multiprocessing import Pool
 
 import numpy as np
 from minizinc import Instance, Model, Solver
+from generators.gen_dzn_linear import generateRandomProblems
 
 def solve(linear_problems, solver_string,solver, i, do_print=False):
     if do_print:
@@ -36,22 +37,21 @@ def run(i):
         return (params, output_dict)
     else:
         return None,None
-def main():
+def main(num, max=1500):
     global linear_problems, solver_string, solver
-    solver_string = 'gecode'; num=4
+    solver_string = 'gecode'
     param_file = f"instances/linearproblems_{num}.npy"
     solution_file = f'instances/linear_solutions_{num}.npy'
     solver = Solver.lookup(solver_string)
     solutions = []
     if os.path.exists(solution_file):
         solutions = np.load(solution_file, allow_pickle=True).tolist()
-    linear_problems = list(np.load(param_file, allow_pickle=True).item().values())
-    solution_file = f'instances/linear_solutions_{3}.npy'
-    print(solutions[-1:],np.load(solution_file, allow_pickle=True).tolist()[-1:])
-    print(solutions[0],np.load(solution_file, allow_pickle=True).tolist()[0])
-    assert solutions[-1:] == np.load(solution_file, allow_pickle=True).tolist()[-1:]
+    linear_problems = list(np.load(param_file, allow_pickle=True).item().values())[:max]
+    # print(solutions[-1:],np.load(solution_file, allow_pickle=True).tolist()[-1:])
+    # print(solutions[0],np.load(solution_file, allow_pickle=True).tolist()[0])
+    # assert solutions[-1:] == np.load(solution_file, allow_pickle=True).tolist()[-1:]
     parallel = 10
-    print(f"Running seed {num} Start at", len(linear_problems))
+    print(f"Running seed {num} Start at", len(solutions))
     for i in range(len(solutions), len(linear_problems), parallel):
         with Pool(parallel) as p:
             ret = p.map(run, range(i, i + parallel))
@@ -61,6 +61,11 @@ def main():
 
     np.save(solution_file, solutions)
 
-
+def run_and_solve(i):
+    #  generateRandomProblems(save_np=True, seed=i)
+     main(i)
+     
 if __name__ == '__main__':
-    main()
+    from concurrent.futures import ProcessPoolExecutor as Pool
+    for i in range(5,5+8):
+        run_and_solve(i)
