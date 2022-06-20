@@ -26,7 +26,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
-
+imitation_learning/work_dir
+runs/
 /chsp-generators-main/instances/
 
 # PyInstaller
