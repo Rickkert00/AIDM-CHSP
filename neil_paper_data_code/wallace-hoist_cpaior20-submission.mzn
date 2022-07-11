@@ -25,7 +25,7 @@ include "globals.mzn";
 % include "PU.dzn" ;
 include "1-1-1.dzn";
 % include "../chsp-generators-main/instances/linear/1.dzn";
-%include "BO1.dzn" ;
+include "BO1_manual_multiplier2.dzn" ;
 
 
 %%% parameters %%%

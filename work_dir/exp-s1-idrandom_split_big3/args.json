@@ -1,0 +1,10 @@
+{
+    "batch_size": 128,
+    "decay": 0.999,
+    "epochs": 2000,
+    "hidden_dim": 1024,
+    "learning_rate": 0.002,
+    "log_interval": 100,
+    "seed": 1,
+    "work_dir": "work_dir/exp-s1-idrandom_split_big3"
+}

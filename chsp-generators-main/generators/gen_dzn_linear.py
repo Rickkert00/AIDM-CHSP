@@ -1,5 +1,6 @@
 import itertools
 import random
+from debugpy import debug_this_thread
 
 import numpy as np
 
@@ -129,33 +130,35 @@ def generate_problem(tanks, processingTimeBase, lowerVsUpperMean, timeMinVariabi
     return {'Ninner': tanks, 'tmin': lowers, 'tmax': uppers, 'f': fulls, 'e': e, 'emptys': emptys}
 
 
-def generateRandomProblems(save_np=False):
+def generateRandomProblems(save_np=False, seed=0, max=999999):
+    random.seed(seed)
+    debug=False
     processingTimeScale = [30, 60, 100, 150, 250, 450, 600]
     similarity = ["similar", "diverse"]
     variability = ["small", "large"]
     timeRange = ["fixed", "small", "large"]
     inst = 0
-    instances = []
+    instances = {}
     base_path = "../instances/linear"
-    for rounds, tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability in itertools.product(range(1, 4), range(3, 25), processingTimeScale,
-                                                                                                                     similarity, variability, timeRange, variability):
+    filename = base_path + f"problems_{seed}.npy"
+    for tanks, rounds, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability,  in itertools.product(
+            range(3, 25), range(1, 4), processingTimeScale, similarity, variability, timeRange, variability):
         inst += 1
-        problem = generate_problem(tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability, save_np)
-        filename = f"{base_path}/{inst}.dzn"
+        vars = tanks, processingTimeBase, lowerVsUpperMean, timeMinVariability, emptyTimeRange, loadedTimeVariability
+        problem = generate_problem(*vars, save_np)
         if save_np:
-          instances.append(problem)
-        else:
-          save_problem_to_file(filename, *list(problem.values()))
-    if save_np:
+            instances[str(vars)] = problem
+            if inst % 10 == 1 and not debug:
+                print(f"Saving with instances {inst}")
+                np.save(base_path + f"problems_{seed}.npy", instances)
+        elif not debug:
+            filename = f"{base_path}/{inst}.dzn"
+            save_problem_to_file(filename, *list(problem.values()))
+        if inst >= max:
+            break
+    if save_np and not debug:
         print("save np")
         np.save(base_path + "problems.npy", instances)
 
-# Main code
-def main():
-    random.seed(0)
-    generateRandomProblems(save_np=True)
-
-
 if __name__ == "__main__":
-    main()
-    print("For safety reasons the run function is commented ")
+    generateRandomProblems(save_np=True, seed=1)

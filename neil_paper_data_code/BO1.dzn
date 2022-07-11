@@ -9,7 +9,7 @@
 %
 
 Ninner = 12;                   % tanks
-J = 9;                         % jobs (used if  constraint sum(B) <=J;  is uncommentd)
+% J = 9;                         % jobs (used if  constraint sum(B) <=J;  is uncommentd)
 
 tmin = [2400, 1800, 600, 600, 600, 600, 1200, 600, 1200, 600, 900, 2400];
 tmax = [INF,2400,900,2400,900,1200,1800,900,1450,900,1200,4200];

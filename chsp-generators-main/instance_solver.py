@@ -1,7 +1,10 @@
+import os
 import time
+from multiprocessing import Pool
 
 import numpy as np
 from minizinc import Instance, Model, Solver
+from generators.gen_dzn_linear import generateRandomProblems
 
 def solve(linear_problems, solver_string,solver, i, do_print=False):
     if do_print:
@@ -26,29 +29,43 @@ def solve(linear_problems, solver_string,solver, i, do_print=False):
     if results.solution is None:
       return None, None
     return results, params
-
-def main():
-    NUM_EXAMPLES = 5000
-    solver_string = 'gecode'
-
-    solver = Solver.lookup(solver_string)
-    solutions = []
-
-    param_file = "instances/linearproblems.npy"
-    linear_problems = np.load(param_file, allow_pickle=True)
-    for i in range(NUM_EXAMPLES + 1):
-      results, params = solve(linear_problems, solver_string, solver,  i)
-      if results is not None:
+def run(i):
+    results, params = solve(linear_problems, solver_string, solver, i)
+    if results is not None:
         output_dict = {k: getattr(results.solution, k) for k in results.solution.__dict__ if k[0] != '_'}
         output_dict['jobs'] = int(str(results).split('jobs ')[1])
-        solutions.append((params, output_dict))
-        if i %10 == 1:
-          print("Temp saving. Currently at index", i, 'of total', NUM_EXAMPLES+1)
-              # temp save
-          np.save('instances/linear_solutions.npy', solutions)
+        return (params, output_dict)
+    else:
+        return None,None
+def main(num, max=1500):
+    global linear_problems, solver_string, solver
+    solver_string = 'gecode'
+    param_file = f"instances/linearproblems_{num}.npy"
+    solution_file = f'instances/linear_solutions_{num}.npy'
+    solver = Solver.lookup(solver_string)
+    solutions = []
+    if os.path.exists(solution_file):
+        solutions = np.load(solution_file, allow_pickle=True).tolist()
+    linear_problems = list(np.load(param_file, allow_pickle=True).item().values())[:max]
+    # print(solutions[-1:],np.load(solution_file, allow_pickle=True).tolist()[-1:])
+    # print(solutions[0],np.load(solution_file, allow_pickle=True).tolist()[0])
+    # assert solutions[-1:] == np.load(solution_file, allow_pickle=True).tolist()[-1:]
+    parallel = 10
+    print(f"Running seed {num} Start at", len(solutions))
+    for i in range(len(solutions), len(linear_problems), parallel):
+        with Pool(parallel) as p:
+            ret = p.map(run, range(i, i + parallel))
+            solutions.extend(ret)
+        print("Temp saving. Currently at index", i, 'of total', len(linear_problems))
+        np.save(solution_file, solutions)
 
-    np.save('instances/linear_solutions.npy', solutions)
+    np.save(solution_file, solutions)
 
-
+def run_and_solve(i):
+    #  generateRandomProblems(save_np=True, seed=i)
+     main(i)
+     
 if __name__ == '__main__':
-    main()
+    from concurrent.futures import ProcessPoolExecutor as Pool
+    for i in range(5,5+8):
+        run_and_solve(i)
